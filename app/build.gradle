@@ -33,7 +33,8 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
 
-    api 'com.artifex.mupdf:mini:1.17.0'
+//    api 'com.artifex.mupdf:mini:1.17.0'
+    api 'com.artifex.mupdf:fitz:1.17.0'
 }
 repositories {
     mavenCentral()
