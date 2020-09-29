@@ -152,11 +152,10 @@ class DocumentActivity : Activity() {
         search_backward_button.setOnClickListener { search(-1) }
         search_forward_button.setOnClickListener { search(1) }
         outline_button.setOnClickListener {
-            val intent = Intent(this@DocumentActivity, OutlineActivity::class.java)
-            intent.putExtras(Bundle().apply {
-                putInt("POSITION", currentPage)
-                putSerializable("OUTLINE", flatOutline)
-            })
+            val intent = Intent(this@DocumentActivity, OutlineActivity::class.java).apply {
+                putExtra("POSITION", currentPage)
+                putExtra("OUTLINE", flatOutline)
+            }
             startActivityForResult(intent, NAVIGATE_REQUEST)
         }
         zoom_button.setOnClickListener {
