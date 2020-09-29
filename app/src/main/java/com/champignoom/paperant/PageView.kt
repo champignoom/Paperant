@@ -11,14 +11,16 @@ import android.view.View
 import android.widget.Scroller
 import com.artifex.mupdf.fitz.Link
 import com.artifex.mupdf.fitz.Quad
+import java.lang.Integer.max
 
 class PageView(ctx: Context?, atts: AttributeSet?) :
     View(ctx, atts), GestureDetector.OnGestureListener, OnScaleGestureListener {
+    var viewScale = 1f
+    var minScale = 1f
+    var maxScale = 2f
+
     var actionListener: DocumentActivity? = null
-    var pageScale: Float
-    var viewScale: Float
-    var minScale: Float
-    var maxScale: Float
+    var pageScale = 1f
     var bitmap: Bitmap? = null
     var bitmapW = 0
     var bitmapH = 0
@@ -29,14 +31,29 @@ class PageView(ctx: Context?, atts: AttributeSet?) :
     var links: Array<Link>? = null
     var hits: Array<Quad>? = null
     var showLinks = false
-    var detector: GestureDetector
-    var scaleDetector: ScaleGestureDetector
-    var scroller: Scroller
     var error = false
-    var errorPaint: Paint
-    var errorPath: Path
-    var linkPaint: Paint
-    var hitPaint: Paint
+
+    private val detector = GestureDetector(ctx, this)
+    private val scaleDetector = ScaleGestureDetector(ctx, this)
+    private val scroller: Scroller = Scroller(ctx)
+    private val errorPaint = Paint().apply {
+        setARGB(255, 255, 80, 80)
+        strokeWidth = 5f
+        style = Paint.Style.STROKE
+    }
+    private val errorPath = Path().apply {
+        moveTo(-100f, -100f)
+        lineTo(100f, 100f)
+        moveTo(100f, -100f)
+        lineTo(-100f, 100f)
+    }
+    private val linkPaint = Paint().apply {
+        setARGB(32, 0, 0, 255)
+    }
+    private val hitPaint = Paint().apply {
+        setARGB(32, 255, 0, 0)
+        style = Paint.Style.FILL
+    }
 
     fun setError() {
         bitmap?.recycle()
@@ -97,18 +114,17 @@ class PageView(ctx: Context?, atts: AttributeSet?) :
         val x = e.x
         val y = e.y
         if (showLinks && links != null) {
-            val dx =
-                if (bitmapW <= canvasW) ((bitmapW - canvasW) / 2).toFloat() else tScrollX.toFloat()
-            val dy =
-                if (bitmapH <= canvasH) ((bitmapH - canvasH) / 2).toFloat() else tScrollY.toFloat()
+            val dx = (if (bitmapW <= canvasW) ((bitmapW - canvasW) / 2) else tScrollX).toFloat()
+            val dy = (if (bitmapH <= canvasH) ((bitmapH - canvasH) / 2) else tScrollY).toFloat()
             val mx = (x + dx) / viewScale
             val my = (y + dy) / viewScale
             for (link in links!!) {
                 val b = link.bounds
-                if (mx >= b.x0 && mx <= b.x1 && my >= b.y0 && my <= b.y1) {
-                    if (link.isExternal) actionListener!!.gotoURI(link.uri) else actionListener!!.gotoPage(
-                        link.uri
-                    )
+                if ((mx in b.x0 .. b.x1) && (my in b.y0 .. b.y1)) {
+                    if (link.isExternal)
+                        actionListener!!.gotoURI(link.uri)
+                    else
+                        actionListener!!.gotoPage(link.uri)
                     foundLink = true
                     break
                 }
@@ -117,9 +133,11 @@ class PageView(ctx: Context?, atts: AttributeSet?) :
         if (!foundLink) {
             val a = canvasW / 3.toFloat()
             val b = a * 2
-            if (x <= a) goBackward()
-            if (x >= b) goForward()
-            if (x > a && x < b) actionListener!!.toggleUI()
+            when {
+                x <= a -> goBackward()
+                x >= b -> goForward()
+                else -> actionListener!!.toggleUI()
+            }
         }
         invalidate()
         return true
@@ -137,8 +155,8 @@ class PageView(ctx: Context?, atts: AttributeSet?) :
 
     override fun onFling(e1: MotionEvent, e2: MotionEvent, dx: Float, dy: Float): Boolean {
         if (bitmap != null) {
-            val maxX = if (bitmapW > canvasW) bitmapW - canvasW else 0
-            val maxY = if (bitmapH > canvasH) bitmapH - canvasH else 0
+            val maxX = max(bitmapW - canvasW, 0)
+            val maxY = max(bitmapH - canvasH, 0)
             scroller.forceFinished(true)
             scroller.fling(tScrollX, tScrollY, (-dx).toInt(), (-dy).toInt(), 0, maxX, 0, maxY)
             invalidate()
@@ -158,8 +176,7 @@ class PageView(ctx: Context?, atts: AttributeSet?) :
             val pageFocusX = (focusX + tScrollX) / viewScale
             val pageFocusY = (focusY + tScrollY) / viewScale
             viewScale *= scaleFactor
-            if (viewScale < minScale) viewScale = minScale
-            if (viewScale > maxScale) viewScale = maxScale
+            viewScale = viewScale.coerceIn(minScale, maxScale)
             bitmapW = (bitmap!!.width * viewScale / pageScale).toInt()
             bitmapH = (bitmap!!.height * viewScale / pageScale).toInt()
             tScrollX = (pageFocusX * viewScale - focusX).toInt()
@@ -229,23 +246,22 @@ class PageView(ctx: Context?, atts: AttributeSet?) :
             tScrollX = 0
             x = (canvasW - bitmapW) / 2
         } else {
-            if (tScrollX < 0) tScrollX = 0
-            if (tScrollX > bitmapW - canvasW) tScrollX = bitmapW - canvasW
+            tScrollX = tScrollX.coerceIn(0, bitmapW - canvasW)
             x = -tScrollX
         }
         if (bitmapH <= canvasH) {
             tScrollY = 0
             y = (canvasH - bitmapH) / 2
         } else {
-            if (tScrollY < 0) tScrollY = 0
-            if (tScrollY > bitmapH - canvasH) tScrollY = bitmapH - canvasH
+            tScrollY = tScrollY.coerceIn(0, bitmapH - canvasH)
             y = -tScrollY
         }
+
         dst[x, y, x + bitmapW] = y + bitmapH
         canvas.drawBitmap(bitmap!!, null, dst, null)
-        if (showLinks && links != null && links!!.size > 0) {
-            for (link in links!!) {
-                val b = link.bounds
+        if (showLinks) {
+            links?.forEach {
+                val b = it.bounds
                 canvas.drawRect(
                     x + b.x0 * viewScale,
                     y + b.y0 * viewScale,
@@ -255,40 +271,17 @@ class PageView(ctx: Context?, atts: AttributeSet?) :
                 )
             }
         }
-        if (hits != null && hits!!.size > 0) {
-            for (q in hits!!) {
-                path.rewind()
-                path.moveTo(x + q.ul_x * viewScale, y + q.ul_y * viewScale)
-                path.lineTo(x + q.ll_x * viewScale, y + q.ll_y * viewScale)
-                path.lineTo(x + q.lr_x * viewScale, y + q.lr_y * viewScale)
-                path.lineTo(x + q.ur_x * viewScale, y + q.ur_y * viewScale)
-                path.close()
-                canvas.drawPath(path, hitPaint)
-            }
-        }
-    }
 
-    init {
-        scroller = Scroller(ctx)
-        detector = GestureDetector(ctx, this)
-        scaleDetector = ScaleGestureDetector(ctx, this)
-        pageScale = 1f
-        viewScale = 1f
-        minScale = 1f
-        maxScale = 2f
-        linkPaint = Paint()
-        linkPaint.setARGB(32, 0, 0, 255)
-        hitPaint = Paint()
-        hitPaint.setARGB(32, 255, 0, 0)
-        hitPaint.style = Paint.Style.FILL
-        errorPaint = Paint()
-        errorPaint.setARGB(255, 255, 80, 80)
-        errorPaint.strokeWidth = 5f
-        errorPaint.style = Paint.Style.STROKE
-        errorPath = Path()
-        errorPath.moveTo(-100f, -100f)
-        errorPath.lineTo(100f, 100f)
-        errorPath.moveTo(100f, -100f)
-        errorPath.lineTo(-100f, 100f)
+        hits?.forEach {q ->
+            path.apply {
+                rewind()
+                moveTo(x + q.ul_x * viewScale, y + q.ul_y * viewScale)
+                lineTo(x + q.ll_x * viewScale, y + q.ll_y * viewScale)
+                lineTo(x + q.lr_x * viewScale, y + q.lr_y * viewScale)
+                lineTo(x + q.ur_x * viewScale, y + q.ur_y * viewScale)
+                close()
+            }
+            canvas.drawPath(path, hitPaint)
+        }
     }
 }
