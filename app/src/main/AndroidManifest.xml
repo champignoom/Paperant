@@ -1,35 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.champignoom.paperant">
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE"
-        />
+
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
     <application
-        android:requestLegacyExternalStorage="true"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:requestLegacyExternalStorage="true"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".MainActivity">
+        <activity android:name=".TestRoundPadActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <activity android:name=".DocumentActivity"
-            android:label="MuPDF mini"
+        <activity android:name=".MainActivity">
+            <intent-filter>
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".DocumentActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:hardwareAccelerated="false"
-            >
+            android:label="MuPDF mini">
             <intent-filter>
+
                 <!-- match content and file requests with known mime-type -->
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.BROWSABLE" />
                 <category android:name="android.intent.category.DEFAULT" />
+
                 <data android:scheme="content" />
                 <data android:scheme="file" />
                 <data android:mimeType="application/pdf" />
@@ -42,10 +48,13 @@
                 <data android:mimeType="text/xml" />
             </intent-filter>
             <intent-filter>
+
                 <!-- match file requests with path and no mime-type -->
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.BROWSABLE" />
                 <category android:name="android.intent.category.DEFAULT" />
+
                 <data android:scheme="file" />
                 <data android:host="*" />
                 <data android:pathPattern=".*\\.pdf" />
@@ -74,10 +83,13 @@
                 <data android:pathPattern=".*\\..*\\..*\\..*\\.fb2" />
             </intent-filter>
             <intent-filter>
+
                 <!-- match file scheme requests with path and any mime-type -->
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.BROWSABLE" />
                 <category android:name="android.intent.category.DEFAULT" />
+
                 <data android:scheme="file" />
                 <data android:host="*" />
                 <data android:pathPattern=".*\\.pdf" />
@@ -107,10 +119,9 @@
                 <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
-        <activity android:name=".OutlineActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            >
-        </activity>
+        <activity
+            android:name=".OutlineActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"></activity>
     </application>
 
 </manifest>

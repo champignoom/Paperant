@@ -39,7 +39,7 @@ class PageView(ctx: Context?, atts: AttributeSet?) :
     var hitPaint: Paint
 
     fun setError() {
-        if (bitmap != null) bitmap!!.recycle()
+        bitmap?.recycle()
         error = true
         links = null
         hits = null
@@ -48,7 +48,7 @@ class PageView(ctx: Context?, atts: AttributeSet?) :
     }
 
     fun setBitmap(b: Bitmap?, zoom: Float, wentBack: Boolean, ls: Array<Link>?, hs: Array<Quad>?) {
-        if (bitmap != null) bitmap!!.recycle()
+        bitmap?.recycle()
         error = false
         links = ls
         hits = hs

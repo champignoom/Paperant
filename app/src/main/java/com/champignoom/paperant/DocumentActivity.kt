@@ -27,6 +27,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.artifex.mupdf.fitz.*
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
+import kotlinx.android.synthetic.main.activity_document.*
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.security.MessageDigest
@@ -57,22 +58,22 @@ class DocumentActivity : Activity() {
     var canvasH = 0
     var pageZoom = 0f
     var currentBar: View? = null
-    var pageView: PageView? = null
-    var actionBar: View? = null
-    var titleLabel: TextView? = null
-    var searchButton: View? = null
-    var searchBar: View? = null
-    var searchText: EditText? = null
-    var searchCloseButton: View? = null
-    var searchBackwardButton: View? = null
-    var searchForwardButton: View? = null
-    var zoomButton: View? = null
-    var layoutButton: View? = null
+//    var page_view: page_view? = null
+//    var action_bar: View? = null
+//    var title_label: TextView? = null
+//    var search_button: View? = null
+//    var search_bar: View? = null
+//    var search_text: EditText? = null
+//    var search_close_button: View? = null
+//    var search_backward_button: View? = null
+//    var search_forward_button: View? = null
+//    var zoom_button: View? = null
+//    var layout_button: View? = null
     var layoutPopupMenu: PopupMenu? = null
-    var outlineButton: View? = null
-    var navigationBar: View? = null
-    var pageLabel: TextView? = null
-    var pageSeekbar: SeekBar? = null
+//    var outline_button: View? = null
+//    var navigation_bar: View? = null
+//    var page_label: TextView? = null
+//    var page_seekbar: SeekBar? = null
     var pageCount = 0
     var currentPage = 0
     var searchHitPage = 0
@@ -82,7 +83,7 @@ class DocumentActivity : Activity() {
     var wentBack = false
     private fun toHex(digest: ByteArray): String {
         val builder = StringBuilder(2 * digest.size)
-        for (b in digest) builder.append(String.format("%02x", b))
+        for (b in digest) builder.append("%02x".format(b))
         return builder.toString()
     }
 
@@ -94,10 +95,10 @@ class DocumentActivity : Activity() {
         windowManager.defaultDisplay.getMetrics(metrics)
         displayDPI = metrics.densityDpi.toFloat()
         setContentView(R.layout.activity_document)
-        actionBar = findViewById(R.id.action_bar)
-        searchBar = findViewById(R.id.search_bar)
-        navigationBar = findViewById(R.id.navigation_bar)
-        currentBar = actionBar
+//        action_bar = findViewById(R.id.action_bar)
+//        search_bar = findViewById(R.id.search_bar)
+//        navigation_bar = findViewById(R.id.navigation_bar)
+        currentBar = action_bar
         val uri = intent.data
         mimetype = intent.type
         key = uri.toString()
@@ -132,8 +133,8 @@ class DocumentActivity : Activity() {
                 Toast.makeText(this, x.message, Toast.LENGTH_SHORT).show()
             }
         }
-        titleLabel = findViewById<View>(R.id.title_label) as TextView
-        titleLabel!!.text = title
+//        title_label = findViewById<View>(R.id.title_label) as TextView
+        title_label.text = title
         history = Stack()
         worker = Worker(this)
         worker!!.start()
@@ -143,16 +144,16 @@ class DocumentActivity : Activity() {
         currentPage = prefs!!.getInt(key, 0)
         searchHitPage = -1
         hasLoaded = false
-        pageView = findViewById<View>(R.id.page_view) as PageView
-        pageView!!.actionListener = this
-        pageLabel = findViewById<View>(R.id.page_label) as TextView
-        pageSeekbar = findViewById<View>(R.id.page_seekbar) as SeekBar
-        pageSeekbar!!.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+//        page_view = findViewById(R.id.page_view)
+        page_view.actionListener = this
+//        page_label = findViewById(R.id.page_label)
+//        page_seekbar = findViewById<View>(R.id.page_seekbar) as SeekBar
+        page_seekbar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
             var newProgress = -1
             override fun onProgressChanged(seekbar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     newProgress = progress
-                    pageLabel!!.text = (progress + 1).toString() + " / " + pageCount
+                    page_label!!.text = "${progress + 1} / ${pageCount}"
                 }
             }
 
@@ -161,49 +162,47 @@ class DocumentActivity : Activity() {
                 gotoPage(newProgress)
             }
         })
-        searchButton = findViewById(R.id.search_button)
-        searchButton!!.setOnClickListener(View.OnClickListener { showSearch() })
-        searchText = findViewById<View>(R.id.search_text) as EditText
-        searchText!!.setOnEditorActionListener(OnEditorActionListener { v, actionId, event ->
+//        search_button = findViewById(R.id.search_button)
+        search_button.setOnClickListener { showSearch() }
+//        search_text = findViewById<View>(R.id.search_text) as EditText
+        search_text.setOnEditorActionListener { v, actionId, event ->
             if (actionId == EditorInfo.IME_NULL && event.action == KeyEvent.ACTION_DOWN) {
                 search(1)
-                return@OnEditorActionListener true
-            }
-            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                true
+            } else if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 search(1)
-                return@OnEditorActionListener true
-            }
-            false
-        })
-        searchText!!.addTextChangedListener(object : TextWatcher {
+                true
+            } else false
+        }
+        search_text.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable) {}
             override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) {
                 resetSearch()
             }
         })
-        searchCloseButton = findViewById(R.id.search_close_button)
-        searchCloseButton!!.setOnClickListener(View.OnClickListener { hideSearch() })
-        searchBackwardButton = findViewById(R.id.search_backward_button)
-        searchBackwardButton!!.setOnClickListener(View.OnClickListener { search(-1) })
-        searchForwardButton = findViewById(R.id.search_forward_button)
-        searchForwardButton!!.setOnClickListener(View.OnClickListener { search(1) })
-        outlineButton = findViewById(R.id.outline_button)
-        outlineButton!!.setOnClickListener(View.OnClickListener {
+//        search_close_button = findViewById(R.id.search_close_button)
+        search_close_button.setOnClickListener(View.OnClickListener { hideSearch() })
+//        search_backward_button = findViewById(R.id.search_backward_button)
+        search_backward_button.setOnClickListener(View.OnClickListener { search(-1) })
+//        search_forward_button = findViewById(R.id.search_forward_button)
+        search_forward_button.setOnClickListener(View.OnClickListener { search(1) })
+//        outline_button = findViewById(R.id.outline_button)
+        outline_button.setOnClickListener {
             val intent = Intent(this@DocumentActivity, OutlineActivity::class.java)
             val bundle = Bundle()
             bundle.putInt("POSITION", currentPage)
             bundle.putSerializable("OUTLINE", flatOutline)
             intent.putExtras(bundle)
             startActivityForResult(intent, NAVIGATE_REQUEST)
-        })
-        zoomButton = findViewById(R.id.zoom_button)
-        zoomButton!!.setOnClickListener(View.OnClickListener {
+        }
+//        zoom_button = findViewById(R.id.zoom_button)
+        zoom_button.setOnClickListener {
             fitPage = !fitPage
             loadPage()
-        })
-        layoutButton = findViewById(R.id.layout_button)
-        layoutPopupMenu = PopupMenu(this, layoutButton)
+        }
+//        layout_button = findViewById(R.id.layout_button)
+        layoutPopupMenu = PopupMenu(this, layout_button)
         layoutPopupMenu!!.menuInflater.inflate(R.menu.layout_menu, layoutPopupMenu!!.menu)
         layoutPopupMenu!!.setOnMenuItemClickListener { item ->
             val oldLayoutEm = layoutEm
@@ -222,7 +221,7 @@ class DocumentActivity : Activity() {
             if (oldLayoutEm != layoutEm) relayoutDocument()
             true
         }
-        layoutButton!!.setOnClickListener(View.OnClickListener { layoutPopupMenu!!.show() })
+        layout_button.setOnClickListener { layoutPopupMenu!!.show() }
     }
 
     fun onPageViewSizeChanged(w: Int, h: Int) {
@@ -322,19 +321,19 @@ class DocumentActivity : Activity() {
 
     fun showKeyboard() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-        imm?.showSoftInput(searchText, 0)
+        imm.showSoftInput(search_text, 0)
     }
 
     fun hideKeyboard() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-        imm?.hideSoftInputFromWindow(searchText!!.windowToken, 0)
+        imm.hideSoftInputFromWindow(search_text!!.windowToken, 0)
     }
 
     fun resetSearch() {
         stopSearch = true
         searchHitPage = -1
         searchNeedle = null
-        pageView!!.resetHits()
+        page_view.resetHits()
     }
 
     fun runSearch(startPage: Int, direction: Int, needle: String) {
@@ -359,7 +358,7 @@ class DocumentActivity : Activity() {
 
             override fun run() {
                 if (stopSearch || needle !== searchNeedle) {
-                    pageLabel!!.text = (currentPage + 1).toString() + " / " + pageCount
+                    page_label.text = "${currentPage + 1} / ${pageCount}"
                 } else if (searchHitPage == currentPage) {
                     loadPage()
                 } else if (searchHitPage >= 0) {
@@ -368,10 +367,10 @@ class DocumentActivity : Activity() {
                     loadPage()
                 } else {
                     if (searchPage >= 0 && searchPage < pageCount) {
-                        pageLabel!!.text = (searchPage + 1).toString() + " / " + pageCount
+                        page_label!!.text = "${searchPage + 1} / ${pageCount}"
                         worker!!.add(this)
                     } else {
-                        pageLabel!!.text = (currentPage + 1).toString() + " / " + pageCount
+                        page_label!!.text = "${currentPage + 1} / ${pageCount}"
                         Log.i(APP, "search not found")
                         Toast.makeText(
                             this@DocumentActivity,
@@ -386,12 +385,11 @@ class DocumentActivity : Activity() {
 
     fun search(direction: Int) {
         hideKeyboard()
-        val startPage: Int
-        startPage = if (searchHitPage == currentPage) currentPage + direction else currentPage
+        val startPage = if (searchHitPage == currentPage) currentPage + direction else currentPage
         searchHitPage = -1
-        searchNeedle = searchText!!.text.toString()
-        if (searchNeedle!!.length == 0) searchNeedle = null
-        if (searchNeedle != null) if (startPage >= 0 && startPage < pageCount) runSearch(
+        searchNeedle = search_text.text.toString()
+        if (searchNeedle!!.isEmpty()) searchNeedle = null
+        if (searchNeedle != null) if (startPage in 0 until pageCount) runSearch(
             startPage, direction,
             searchNeedle!!
         )
@@ -419,11 +417,13 @@ class DocumentActivity : Activity() {
             }
 
             override fun run() {
-                if (currentPage < 0 || currentPage >= pageCount) currentPage = 0
-                titleLabel!!.text = title
-                if (isReflowable) layoutButton!!.visibility =
-                    View.VISIBLE else zoomButton!!.visibility =
-                    View.VISIBLE
+                if (currentPage !in 0 until pageCount)
+                    currentPage = 0
+                title_label.text = title
+                if (isReflowable)
+                    layout_button.visibility = View.VISIBLE
+                else
+                    zoom_button.visibility = View.VISIBLE
                 loadPage()
                 loadOutline()
             }
@@ -483,7 +483,8 @@ class DocumentActivity : Activity() {
             }
 
             override fun run() {
-                if (flatOutline != null) outlineButton!!.visibility = View.VISIBLE
+                if (flatOutline != null)
+                    outline_button.visibility = View.VISIBLE
             }
         })
     }
@@ -509,60 +510,60 @@ class DocumentActivity : Activity() {
                             canvasH
                         ) else AndroidDrawDevice.fitPageWidth(page, canvasW)
                     links = page.links
-                    if (links != null) for (link in links!!) link.bounds.transform(ctm)
+                    links?.forEach { it.bounds.transform(ctm) }
                     if (searchNeedle != null) {
                         hits = page.search(searchNeedle)
-                        if (hits != null) for (hit in hits!!) hit.transform(ctm)
+                        hits?.forEach { it.transform(ctm) }
                     }
                     if (zoom != 1f) ctm.scale(zoom)
                     bitmap = AndroidDrawDevice.drawPage(page, ctm)
                 } catch (x: Throwable) {
-                    Log.e(APP, x.message)
+                    Log.e(APP, x.message!!)
                 }
             }
 
             override fun run() {
-                if (bitmap != null) pageView!!.setBitmap(
+                if (bitmap != null) page_view!!.setBitmap(
                     bitmap,
                     zoom,
                     wentBack,
                     links,
                     hits
-                ) else pageView!!.setError()
-                pageLabel!!.text = (currentPage + 1).toString() + " / " + pageCount
-                pageSeekbar!!.max = pageCount - 1
-                pageSeekbar!!.progress = pageNumber
+                ) else page_view.setError()
+                page_label.text = "${currentPage + 1} / ${pageCount}"
+                page_seekbar.max = pageCount - 1
+                page_seekbar.progress = pageNumber
                 wentBack = false
             }
         })
     }
 
     fun showSearch() {
-        currentBar = searchBar
-        actionBar!!.visibility = View.GONE
-        searchBar!!.visibility = View.VISIBLE
-        searchBar!!.requestFocus()
+        currentBar = search_bar
+        action_bar.visibility = View.GONE
+        search_bar.visibility = View.VISIBLE
+        search_bar.requestFocus()
         showKeyboard()
     }
 
     fun hideSearch() {
-        currentBar = actionBar
-        actionBar!!.visibility = View.VISIBLE
-        searchBar!!.visibility = View.GONE
+        currentBar = action_bar
+        action_bar.visibility = View.VISIBLE
+        search_bar.visibility = View.GONE
         hideKeyboard()
         resetSearch()
     }
 
     fun toggleUI() {
-        if (navigationBar!!.visibility == View.VISIBLE) {
+        if (navigation_bar.visibility == View.VISIBLE) {
             currentBar!!.visibility = View.GONE
-            navigationBar!!.visibility = View.GONE
-            if (currentBar === searchBar) hideKeyboard()
+            navigation_bar.visibility = View.GONE
+            if (currentBar === search_bar) hideKeyboard()
         } else {
             currentBar!!.visibility = View.VISIBLE
-            navigationBar!!.visibility = View.VISIBLE
-            if (currentBar === searchBar) {
-                searchBar!!.requestFocus()
+            navigation_bar.visibility = View.VISIBLE
+            if (currentBar === search_bar) {
+                search_bar.requestFocus()
                 showKeyboard()
             }
         }
@@ -584,7 +585,7 @@ class DocumentActivity : Activity() {
     }
 
     fun gotoPage(p: Int) {
-        if (p >= 0 && p < pageCount && p != currentPage) {
+        if (p in 0 until pageCount && p != currentPage) {
             history!!.push(currentPage)
             currentPage = p
             loadPage()
@@ -601,7 +602,7 @@ class DocumentActivity : Activity() {
         try {
             startActivity(intent)
         } catch (x: Throwable) {
-            Log.e(APP, x.message)
+            Log.e(APP, x.message!!)
             Toast.makeText(this@DocumentActivity, x.message, Toast.LENGTH_SHORT).show()
         }
     }
