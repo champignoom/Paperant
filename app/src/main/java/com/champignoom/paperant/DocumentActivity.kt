@@ -82,9 +82,7 @@ class DocumentActivity : Activity() {
     var history: Stack<Int>? = null
     var wentBack = false
     private fun toHex(digest: ByteArray): String {
-        val builder = StringBuilder(2 * digest.size)
-        for (b in digest) builder.append("%02x".format(b))
-        return builder.toString()
+        return digest.joinToString("") {"%02x".format(it)}
     }
 
     public override fun onCreate(savedInstanceState: Bundle?) {
@@ -153,7 +151,7 @@ class DocumentActivity : Activity() {
             override fun onProgressChanged(seekbar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     newProgress = progress
-                    page_label!!.text = "${progress + 1} / ${pageCount}"
+                    page_label.text = "${progress + 1} / ${pageCount}"
                 }
             }
 
@@ -172,7 +170,8 @@ class DocumentActivity : Activity() {
             } else if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 search(1)
                 true
-            } else false
+            } else
+                false
         }
         search_text.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable) {}
@@ -182,11 +181,11 @@ class DocumentActivity : Activity() {
             }
         })
 //        search_close_button = findViewById(R.id.search_close_button)
-        search_close_button.setOnClickListener(View.OnClickListener { hideSearch() })
+        search_close_button.setOnClickListener { hideSearch() }
 //        search_backward_button = findViewById(R.id.search_backward_button)
-        search_backward_button.setOnClickListener(View.OnClickListener { search(-1) })
+        search_backward_button.setOnClickListener { search(-1) }
 //        search_forward_button = findViewById(R.id.search_forward_button)
-        search_forward_button.setOnClickListener(View.OnClickListener { search(1) })
+        search_forward_button.setOnClickListener { search(1) }
 //        outline_button = findViewById(R.id.outline_button)
         outline_button.setOnClickListener {
             val intent = Intent(this@DocumentActivity, OutlineActivity::class.java)
@@ -206,18 +205,20 @@ class DocumentActivity : Activity() {
         layoutPopupMenu!!.menuInflater.inflate(R.menu.layout_menu, layoutPopupMenu!!.menu)
         layoutPopupMenu!!.setOnMenuItemClickListener { item ->
             val oldLayoutEm = layoutEm
-            val id = item.itemId
-            if (id == R.id.action_layout_6pt) layoutEm =
-                6f else if (id == R.id.action_layout_7pt) layoutEm =
-                7f else if (id == R.id.action_layout_8pt) layoutEm =
-                8f else if (id == R.id.action_layout_9pt) layoutEm =
-                9f else if (id == R.id.action_layout_10pt) layoutEm =
-                10f else if (id == R.id.action_layout_11pt) layoutEm =
-                11f else if (id == R.id.action_layout_12pt) layoutEm =
-                12f else if (id == R.id.action_layout_13pt) layoutEm =
-                13f else if (id == R.id.action_layout_14pt) layoutEm =
-                14f else if (id == R.id.action_layout_15pt) layoutEm =
-                15f else if (id == R.id.action_layout_16pt) layoutEm = 16f
+            layoutEm = when (item.itemId) {
+                R.id.action_layout_6pt -> 6f
+                R.id.action_layout_7pt -> 7f
+                R.id.action_layout_8pt -> 8f
+                R.id.action_layout_9pt -> 9f
+                R.id.action_layout_10pt -> 10f
+                R.id.action_layout_11pt -> 11f
+                R.id.action_layout_12pt -> 12f
+                R.id.action_layout_13pt -> 13f
+                R.id.action_layout_14pt -> 14f
+                R.id.action_layout_15pt -> 15f
+                R.id.action_layout_16pt -> 16f
+                else -> layoutEm
+            }
             if (oldLayoutEm != layoutEm) relayoutDocument()
             true
         }
@@ -252,10 +253,11 @@ class DocumentActivity : Activity() {
             var needsPassword = false
             override fun work() {
                 Log.i(APP, "open document")
-                doc = if (path != null) Document.openDocument(path) else Document.openDocument(
-                    buffer,
-                    mimetype
-                )
+                doc =
+                    if (path != null)
+                        Document.openDocument(path)
+                    else
+                        Document.openDocument(buffer, mimetype)
                 needsPassword = doc!!.needsPassword()
             }
 
@@ -269,18 +271,16 @@ class DocumentActivity : Activity() {
         val passwordView = EditText(this)
         passwordView.inputType = EditorInfo.TYPE_TEXT_VARIATION_PASSWORD
         passwordView.transformationMethod = PasswordTransformationMethod.getInstance()
-        val builder = AlertDialog.Builder(this)
-        builder.setTitle(R.string.dlog_password_title)
-        builder.setMessage(message)
-        builder.setView(passwordView)
-        builder.setPositiveButton(
-            android.R.string.ok
-        ) { dialog, id -> checkPassword(passwordView.text.toString()) }
-        builder.setNegativeButton(
-            android.R.string.cancel
-        ) { dialog, id -> finish() }
-        builder.setOnCancelListener { finish() }
-        builder.create().show()
+        AlertDialog.Builder(this).apply {
+            setTitle(R.string.dlog_password_title)
+            setMessage(message)
+            setView(passwordView)
+            setPositiveButton(android.R.string.ok) { dialog, id -> checkPassword(passwordView.text.toString()) }
+            setNegativeButton(android.R.string.cancel) { dialog, id -> finish() }
+            setOnCancelListener { finish() }
+            create()
+            show()
+        }
     }
 
     fun checkPassword(password: String?) {
@@ -347,12 +347,12 @@ class DocumentActivity : Activity() {
                     val page = doc!!.loadPage(searchPage)
                     val hits = page.search(searchNeedle)
                     page.destroy()
-                    if (hits != null && hits.size > 0) {
+                    if (hits != null && hits.isNotEmpty()) {
                         searchHitPage = searchPage
                         break
                     }
                     searchPage += direction
-                    if (searchPage < 0 || searchPage >= pageCount) break
+                    if (searchPage !in 0 until pageCount) break
                 }
             }
 
@@ -366,7 +366,7 @@ class DocumentActivity : Activity() {
                     currentPage = searchHitPage
                     loadPage()
                 } else {
-                    if (searchPage >= 0 && searchPage < pageCount) {
+                    if (searchPage in 0 until pageCount) {
                         page_label!!.text = "${searchPage + 1} / ${pageCount}"
                         worker!!.add(this)
                     } else {
@@ -389,7 +389,7 @@ class DocumentActivity : Activity() {
         searchHitPage = -1
         searchNeedle = search_text.text.toString()
         if (searchNeedle!!.isEmpty()) searchNeedle = null
-        if (searchNeedle != null) if (startPage in 0 until pageCount) runSearch(
+        if (searchNeedle != null && startPage in 0 until pageCount) runSearch(
             startPage, direction,
             searchNeedle!!
         )
@@ -467,7 +467,8 @@ class DocumentActivity : Activity() {
                             )
                         )
                     }
-                    if (node.down != null) flattenOutline(node.down, "$indent    ")
+                    if (node.down != null)
+                        flattenOutline(node.down, "$indent    ")
                 }
             }
 
@@ -523,7 +524,7 @@ class DocumentActivity : Activity() {
             }
 
             override fun run() {
-                if (bitmap != null) page_view!!.setBitmap(
+                if (bitmap != null) page_view.setBitmap(
                     bitmap,
                     zoom,
                     wentBack,
