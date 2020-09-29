@@ -17,18 +17,18 @@ class OutlineActivity : ListActivity() {
         }
     }
 
-    protected var adapter: ArrayAdapter<Item>? = null
+    private var adapter: ArrayAdapter<Item>? = null
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1)
         listAdapter = adapter
-        val bundle = intent.extras
-        val currentPage = bundle!!.getInt("POSITION")
-        val outline = bundle.getSerializable("OUTLINE") as ArrayList<Item>?
+        val bundle = intent.extras!!
+        val currentPage = bundle.getInt("POSITION")
+        val outline = bundle.getSerializable("OUTLINE") as ArrayList<Item>
         var found = -1
-        for (i in outline!!.indices) {
+        for (i in outline.indices) {
             val item = outline[i]
             if (found < 0 && item.page >= currentPage) found = i
             adapter!!.add(item)
