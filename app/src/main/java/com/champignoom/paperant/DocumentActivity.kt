@@ -82,15 +82,8 @@ class DocumentActivity : Activity() {
         mimetype = intent.type
         key = uri.toString()
         if (uri!!.scheme == "file") {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                ) == PackageManager.PERMISSION_DENIED
-            ) ActivityCompat.requestPermissions(
-                this, arrayOf(
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                ), PERMISSION_REQUEST
-            )
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED)
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), PERMISSION_REQUEST)
             title = uri.lastPathSegment
             path = uri.path
         } else {
@@ -103,7 +96,7 @@ class DocumentActivity : Activity() {
                 while (stm!!.read(buf).also { n = it } != -1) out.write(buf, 0, n)
                 out.flush()
                 buffer = out.toByteArray()
-                key = toHex(MessageDigest.getInstance("MD5").digest(buffer))
+                key = toHex(MessageDigest.getInstance("MD5").digest(buffer!!))
             } catch (x: IOException) {
                 Log.e(APP, x.toString())
                 Toast.makeText(this, x.message, Toast.LENGTH_SHORT).show()
@@ -160,10 +153,10 @@ class DocumentActivity : Activity() {
         search_forward_button.setOnClickListener { search(1) }
         outline_button.setOnClickListener {
             val intent = Intent(this@DocumentActivity, OutlineActivity::class.java)
-            val bundle = Bundle()
-            bundle.putInt("POSITION", currentPage)
-            bundle.putSerializable("OUTLINE", flatOutline)
-            intent.putExtras(bundle)
+            intent.putExtras(Bundle().apply {
+                putInt("POSITION", currentPage)
+                putSerializable("OUTLINE", flatOutline)
+            })
             startActivityForResult(intent, NAVIGATE_REQUEST)
         }
         zoom_button.setOnClickListener {
@@ -247,9 +240,7 @@ class DocumentActivity : Activity() {
             setPositiveButton(android.R.string.ok) { dialog, id -> checkPassword(passwordView.text.toString()) }
             setNegativeButton(android.R.string.cancel) { dialog, id -> finish() }
             setOnCancelListener { finish() }
-            create()
-            show()
-        }
+        }.create().show()
     }
 
     fun checkPassword(password: String?) {
@@ -268,11 +259,11 @@ class DocumentActivity : Activity() {
 
     public override fun onPause() {
         super.onPause()
-        val editor = prefs!!.edit()
-        editor.putFloat("layoutEm", layoutEm)
-        editor.putBoolean("fitPage", fitPage)
-        editor.putInt(key, currentPage)
-        editor.apply()
+        prefs!!.edit().apply {
+            putFloat("layoutEm", layoutEm)
+            putBoolean("fitPage", fitPage)
+            putInt(key, currentPage)
+        }.apply()
     }
 
     override fun onBackPressed() {
@@ -285,7 +276,8 @@ class DocumentActivity : Activity() {
     }
 
     public override fun onActivityResult(request: Int, result: Int, data: Intent) {
-        if (request == NAVIGATE_REQUEST && result >= RESULT_FIRST_USER) gotoPage(result - RESULT_FIRST_USER)
+        if (request == NAVIGATE_REQUEST && result >= RESULT_FIRST_USER)
+            gotoPage(result - RESULT_FIRST_USER)
     }
 
     fun showKeyboard() {
@@ -310,18 +302,20 @@ class DocumentActivity : Activity() {
         worker!!.add(object : Worker.Task() {
             var searchPage = startPage
             override fun work() {
-                if (stopSearch || needle !== searchNeedle) return
-                for (i in 0..8) {
+                if (stopSearch || needle !== searchNeedle)
+                    return
+                repeat(8) {
                     Log.i(APP, "search page $searchPage")
                     val page = doc!!.loadPage(searchPage)
                     val hits = page.search(searchNeedle)
                     page.destroy()
                     if (hits != null && hits.isNotEmpty()) {
                         searchHitPage = searchPage
-                        break
+                        return
                     }
                     searchPage += direction
-                    if (searchPage !in 0 until pageCount) break
+                    if (searchPage !in 0 until pageCount)
+                        return
                 }
             }
 
@@ -334,19 +328,17 @@ class DocumentActivity : Activity() {
                     history!!.push(currentPage)
                     currentPage = searchHitPage
                     loadPage()
+                } else if (searchPage in 0 until pageCount) {
+                    page_label!!.text = "${searchPage + 1} / ${pageCount}"
+                    worker!!.add(this)
                 } else {
-                    if (searchPage in 0 until pageCount) {
-                        page_label!!.text = "${searchPage + 1} / ${pageCount}"
-                        worker!!.add(this)
-                    } else {
-                        page_label!!.text = "${currentPage + 1} / ${pageCount}"
-                        Log.i(APP, "search not found")
-                        Toast.makeText(
-                            this@DocumentActivity,
-                            getString(R.string.toast_search_not_found),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
+                    page_label!!.text = "${currentPage + 1} / ${pageCount}"
+                    Log.i(APP, "search not found")
+                    Toast.makeText(
+                        this@DocumentActivity,
+                        getString(R.string.toast_search_not_found),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         })
@@ -357,11 +349,10 @@ class DocumentActivity : Activity() {
         val startPage = if (searchHitPage == currentPage) currentPage + direction else currentPage
         searchHitPage = -1
         searchNeedle = search_text.text.toString()
-        if (searchNeedle!!.isEmpty()) searchNeedle = null
-        if (searchNeedle != null && startPage in 0 until pageCount) runSearch(
-            startPage, direction,
-            searchNeedle!!
-        )
+        if (searchNeedle!!.isEmpty())
+            searchNeedle = null
+        if (searchNeedle != null && startPage in 0 until pageCount)
+            runSearch(startPage, direction, searchNeedle!!)
     }
 
     fun loadDocument() {
@@ -428,14 +419,13 @@ class DocumentActivity : Activity() {
                 for (node in outline) {
                     if (node.title != null) {
                         val outlinePage = doc!!.pageNumberFromLocation(doc!!.resolveLink(node))
-                        flatOutline!!.add(
-                            OutlineActivity.Item(
-                                indent + node.title,
-                                node.uri,
-                                outlinePage
-                            )
-                        )
+                        flatOutline!!.add(OutlineActivity.Item(
+                            indent + node.title,
+                            node.uri,
+                            outlinePage
+                        ))
                     }
+
                     if (node.down != null)
                         flattenOutline(node.down, "$indent    ")
                 }
@@ -467,24 +457,27 @@ class DocumentActivity : Activity() {
             var bitmap: Bitmap? = null
             var links: Array<Link>? = null
             var hits: Array<Quad>? = null
+
             override fun work() {
                 try {
                     Log.i(APP, "load page $pageNumber")
                     val page = doc!!.loadPage(pageNumber)
+
                     Log.i(APP, "draw page $pageNumber zoom=$zoom")
-                    val ctm: Matrix
-                    ctm =
-                        if (fitPage) AndroidDrawDevice.fitPage(
-                            page,
-                            canvasW,
-                            canvasH
-                        ) else AndroidDrawDevice.fitPageWidth(page, canvasW)
+                    val ctm: Matrix =
+                        if (fitPage)
+                            AndroidDrawDevice.fitPage(page, canvasW, canvasH)
+                        else
+                            AndroidDrawDevice.fitPageWidth(page, canvasW)
+
                     links = page.links
                     links?.forEach { it.bounds.transform(ctm) }
+
                     if (searchNeedle != null) {
                         hits = page.search(searchNeedle)
                         hits?.forEach { it.transform(ctm) }
                     }
+
                     if (zoom != 1f) ctm.scale(zoom)
                     bitmap = AndroidDrawDevice.drawPage(page, ctm)
                 } catch (x: Throwable) {
@@ -493,13 +486,10 @@ class DocumentActivity : Activity() {
             }
 
             override fun run() {
-                if (bitmap != null) page_view.setBitmap(
-                    bitmap,
-                    zoom,
-                    wentBack,
-                    links,
-                    hits
-                ) else page_view.setError()
+                if (bitmap != null)
+                    page_view.setBitmap(bitmap, zoom, wentBack, links, hits)
+                else
+                    page_view.setError()
                 page_label.text = "${currentPage + 1} / ${pageCount}"
                 page_seekbar.max = pageCount - 1
                 page_seekbar.progress = pageNumber
