@@ -5,14 +5,15 @@ import android.util.Log
 import android.widget.Toast
 import java.util.concurrent.LinkedBlockingQueue
 
-class Worker(protected var activity: Activity) : Runnable {
+class Worker(private val activity: Activity) : Runnable {
     open class Task : Runnable {
         open fun work() {} /* The 'work' method will be executed on the background thread. */
         override fun run() {} /* The 'run' method will be executed on the UI thread. */
     }
 
-    protected var queue: LinkedBlockingQueue<Task>
-    protected var alive = false
+    private val queue = LinkedBlockingQueue<Task>()
+    private var alive = false
+
     fun start() {
         alive = true
         Thread(this).start()
@@ -43,9 +44,5 @@ class Worker(protected var activity: Activity) : Runnable {
                 }
             }
         }
-    }
-
-    init {
-        queue = LinkedBlockingQueue()
     }
 }
