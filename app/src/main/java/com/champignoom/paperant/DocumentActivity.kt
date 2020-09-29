@@ -22,7 +22,6 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
 import android.widget.SeekBar.OnSeekBarChangeListener
-import android.widget.TextView.OnEditorActionListener
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.artifex.mupdf.fitz.*
@@ -58,22 +57,7 @@ class DocumentActivity : Activity() {
     var canvasH = 0
     var pageZoom = 0f
     var currentBar: View? = null
-//    var page_view: page_view? = null
-//    var action_bar: View? = null
-//    var title_label: TextView? = null
-//    var search_button: View? = null
-//    var search_bar: View? = null
-//    var search_text: EditText? = null
-//    var search_close_button: View? = null
-//    var search_backward_button: View? = null
-//    var search_forward_button: View? = null
-//    var zoom_button: View? = null
-//    var layout_button: View? = null
     var layoutPopupMenu: PopupMenu? = null
-//    var outline_button: View? = null
-//    var navigation_bar: View? = null
-//    var page_label: TextView? = null
-//    var page_seekbar: SeekBar? = null
     var pageCount = 0
     var currentPage = 0
     var searchHitPage = 0
@@ -93,9 +77,6 @@ class DocumentActivity : Activity() {
         windowManager.defaultDisplay.getMetrics(metrics)
         displayDPI = metrics.densityDpi.toFloat()
         setContentView(R.layout.activity_document)
-//        action_bar = findViewById(R.id.action_bar)
-//        search_bar = findViewById(R.id.search_bar)
-//        navigation_bar = findViewById(R.id.navigation_bar)
         currentBar = action_bar
         val uri = intent.data
         mimetype = intent.type
@@ -131,7 +112,6 @@ class DocumentActivity : Activity() {
                 Toast.makeText(this, x.message, Toast.LENGTH_SHORT).show()
             }
         }
-//        title_label = findViewById<View>(R.id.title_label) as TextView
         title_label.text = title
         history = Stack()
         worker = Worker(this)
@@ -142,10 +122,7 @@ class DocumentActivity : Activity() {
         currentPage = prefs!!.getInt(key, 0)
         searchHitPage = -1
         hasLoaded = false
-//        page_view = findViewById(R.id.page_view)
         page_view.actionListener = this
-//        page_label = findViewById(R.id.page_label)
-//        page_seekbar = findViewById<View>(R.id.page_seekbar) as SeekBar
         page_seekbar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
             var newProgress = -1
             override fun onProgressChanged(seekbar: SeekBar, progress: Int, fromUser: Boolean) {
@@ -160,9 +137,7 @@ class DocumentActivity : Activity() {
                 gotoPage(newProgress)
             }
         })
-//        search_button = findViewById(R.id.search_button)
         search_button.setOnClickListener { showSearch() }
-//        search_text = findViewById<View>(R.id.search_text) as EditText
         search_text.setOnEditorActionListener { v, actionId, event ->
             if (actionId == EditorInfo.IME_NULL && event.action == KeyEvent.ACTION_DOWN) {
                 search(1)
@@ -180,13 +155,9 @@ class DocumentActivity : Activity() {
                 resetSearch()
             }
         })
-//        search_close_button = findViewById(R.id.search_close_button)
         search_close_button.setOnClickListener { hideSearch() }
-//        search_backward_button = findViewById(R.id.search_backward_button)
         search_backward_button.setOnClickListener { search(-1) }
-//        search_forward_button = findViewById(R.id.search_forward_button)
         search_forward_button.setOnClickListener { search(1) }
-//        outline_button = findViewById(R.id.outline_button)
         outline_button.setOnClickListener {
             val intent = Intent(this@DocumentActivity, OutlineActivity::class.java)
             val bundle = Bundle()
@@ -195,12 +166,10 @@ class DocumentActivity : Activity() {
             intent.putExtras(bundle)
             startActivityForResult(intent, NAVIGATE_REQUEST)
         }
-//        zoom_button = findViewById(R.id.zoom_button)
         zoom_button.setOnClickListener {
             fitPage = !fitPage
             loadPage()
         }
-//        layout_button = findViewById(R.id.layout_button)
         layoutPopupMenu = PopupMenu(this, layout_button)
         layoutPopupMenu!!.menuInflater.inflate(R.menu.layout_menu, layoutPopupMenu!!.menu)
         layoutPopupMenu!!.setOnMenuItemClickListener { item ->
