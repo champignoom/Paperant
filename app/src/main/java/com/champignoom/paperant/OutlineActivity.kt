@@ -1,6 +1,5 @@
 package com.champignoom.paperant
 
-import android.R
 import android.app.ListActivity
 import android.os.Bundle
 import android.view.View
@@ -23,7 +22,7 @@ class OutlineActivity : ListActivity() {
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
-        adapter = ArrayAdapter(this, R.layout.simple_list_item_1)
+        adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1)
         listAdapter = adapter
         val bundle = intent.extras
         val currentPage = bundle!!.getInt("POSITION")
