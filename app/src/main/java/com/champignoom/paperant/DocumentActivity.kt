@@ -78,6 +78,7 @@ class DocumentActivity : Activity() {
         displayDPI = metrics.densityDpi.toFloat()
         setContentView(R.layout.activity_document)
         currentBar = action_bar
+
         val uri = intent.data
         mimetype = intent.type
         key = uri.toString()

@@ -17,3 +17,23 @@ Paperant
 | Aspose PDF              | Commercial                                | |
 
 Go with MuPDF.
+
+Function calls:
+`com.artifex.mupdf.fitz.android.AndroidDrawDevice`
+`com.artifex.mupdf.fitz.Document`
+
+Flow:
+- `PageView::onSizeChanged`
+ - `DocumentActivity::onPageViewSizeChanged`
+  - `DocumentActivity::openDocument`
+   + `Document::openDocument`
+   - `DocumentActivity::loadDocument`
+    + `// if reflow: Document::layout`
+    + `Document::countPages
+    - `DocumentActivity::loadPage`
+     + `Document::loadPage`
+     + `AndroidDrawDevice::fitPage`
+     + `AndroidDrawDevice::fitPageWidth`
+     + `AndroidDrawDevice::drawPage` !!
+     - `PageView::setBitmap` -> `View::invalidate` -> `PageView::onDraw`
+      + `Canvas::drawBitmap`
