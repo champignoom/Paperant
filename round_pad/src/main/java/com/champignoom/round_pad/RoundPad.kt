@@ -55,10 +55,12 @@ class RoundPad(context: Context, attrs: AttributeSet): View(context, attrs) {
                 Toast.makeText(context, "Down", Toast.LENGTH_SHORT).show()
 //                onDeltaListener?.invoke(-100.0)
                 lastPolar = toPolar(event.x, event.y)
+                setBackgroundColor(Color.BLUE)
             }
 
             MotionEvent.ACTION_UP -> {
                 lastPolar = Polar(0.0, 0.0)
+                setBackgroundColor(Color.MAGENTA)
             }
 
             MotionEvent.ACTION_MOVE -> run {
@@ -71,9 +73,12 @@ class RoundPad(context: Context, attrs: AttributeSet): View(context, attrs) {
                 val scalePow = (min(newPolar.length, lastPolar.length) / maxLength).coerceAtMost(1.0)
                 val scale = minStep * (maxStep/minStep).pow(scalePow)
                 val delta = (newPolar.angle - lastPolar.angle) / PI
+                val scaledDelta = scale * delta
+
+                setBackgroundColor(if (scaledDelta < 0) Color.GREEN else Color.RED)
 
 //                Log.i("Paperant", "scalePow=${scalePow}, scale=${scale}, delta=${delta}, result=${scale*delta}")
-                onDeltaListener?.invoke(scale * delta)
+                onDeltaListener?.invoke(scaledDelta)
                 lastPolar = newPolar
             }
         }

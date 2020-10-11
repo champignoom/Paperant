@@ -42,7 +42,7 @@ class MainActivity : AppCompatActivity() {
         val file = File(uri.path!!)
         text_view.text = Date(file.lastModified()).toString()
 
-        val intent = Intent(this, DocumentActivity::class.java).apply {
+        val intent = Intent(this, MyDocumentActivity::class.java).apply {
             action = Intent.ACTION_VIEW
             data = uri
         }
