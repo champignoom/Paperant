@@ -12,6 +12,16 @@
         android:layout_height="match_parent"
         />
 
+    <ProgressBar
+        android:id="@+id/progress_indicator"
+        android:layout_width="150dp"
+        android:layout_height="150dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        />
+
     <com.champignoom.round_pad.RoundPad
         android:id="@+id/round_pad"
         android:layout_width="match_parent"
