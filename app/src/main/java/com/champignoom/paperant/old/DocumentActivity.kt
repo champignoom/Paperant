@@ -1,4 +1,4 @@
-package com.champignoom.paperant
+package com.champignoom.paperant.old
 
 import android.Manifest
 import android.app.Activity
@@ -26,7 +26,8 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.artifex.mupdf.fitz.*
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
-import kotlinx.android.synthetic.main.activity_document.*
+import com.champignoom.paperant.R
+import com.champignoom.paperant.databinding.ActivityDocumentBinding
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.security.MessageDigest
@@ -68,6 +69,8 @@ class DocumentActivity : Activity() {
     private fun toHex(digest: ByteArray): String {
         return digest.joinToString("") {"%02x".format(it)}
     }
+    
+    private lateinit var binding: ActivityDocumentBinding
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,8 +79,10 @@ class DocumentActivity : Activity() {
         val metrics = DisplayMetrics()
         windowManager.defaultDisplay.getMetrics(metrics)
         displayDPI = metrics.densityDpi.toFloat()
-        setContentView(R.layout.activity_document)
-        currentBar = action_bar
+        
+        binding = ActivityDocumentBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        currentBar = binding.actionBar
 
         val uri = intent.data
         mimetype = intent.type
@@ -106,7 +111,7 @@ class DocumentActivity : Activity() {
                 Toast.makeText(this, x.message, Toast.LENGTH_SHORT).show()
             }
         }
-        title_label.text = title
+        binding.titleLabel.text = title
         history = Stack()
         worker = Worker(this)
         worker!!.start()
@@ -116,13 +121,13 @@ class DocumentActivity : Activity() {
         currentPage = prefs!!.getInt(key, 0)
         searchHitPage = -1
         hasLoaded = false
-        page_view.actionListener = this
-        page_seekbar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
+        binding.pageView.actionListener = this
+        binding.pageSeekbar.setOnSeekBarChangeListener(object : OnSeekBarChangeListener {
             var newProgress = -1
             override fun onProgressChanged(seekbar: SeekBar, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
                     newProgress = progress
-                    page_label.text = "${progress + 1} / ${pageCount}"
+                    binding.pageLabel.text = "${progress + 1} / ${pageCount}"
                 }
             }
 
@@ -131,8 +136,8 @@ class DocumentActivity : Activity() {
                 gotoPage(newProgress)
             }
         })
-        search_button.setOnClickListener { showSearch() }
-        search_text.setOnEditorActionListener { v, actionId, event ->
+        binding.searchButton.setOnClickListener { showSearch() }
+        binding.searchText.setOnEditorActionListener { v, actionId, event ->
             if (actionId == EditorInfo.IME_NULL && event.action == KeyEvent.ACTION_DOWN) {
                 search(1)
                 true
@@ -142,28 +147,28 @@ class DocumentActivity : Activity() {
             } else
                 false
         }
-        search_text.addTextChangedListener(object : TextWatcher {
+        binding.searchText.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable) {}
             override fun beforeTextChanged(s: CharSequence, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) {
                 resetSearch()
             }
         })
-        search_close_button.setOnClickListener { hideSearch() }
-        search_backward_button.setOnClickListener { search(-1) }
-        search_forward_button.setOnClickListener { search(1) }
-        outline_button.setOnClickListener {
+        binding.searchCloseButton.setOnClickListener { hideSearch() }
+        binding.searchBackwardButton.setOnClickListener { search(-1) }
+        binding.searchForwardButton.setOnClickListener { search(1) }
+        binding.outlineButton.setOnClickListener {
             val intent = Intent(this@DocumentActivity, OutlineActivity::class.java).apply {
                 putExtra("POSITION", currentPage)
                 putExtra("OUTLINE", flatOutline)
             }
             startActivityForResult(intent, NAVIGATE_REQUEST)
         }
-        zoom_button.setOnClickListener {
+        binding.zoomButton.setOnClickListener {
             fitPage = !fitPage
             loadPage()
         }
-        layoutPopupMenu = PopupMenu(this, layout_button)
+        layoutPopupMenu = PopupMenu(this, binding.layoutButton)
         layoutPopupMenu!!.menuInflater.inflate(R.menu.layout_menu, layoutPopupMenu!!.menu)
         layoutPopupMenu!!.setOnMenuItemClickListener { item ->
             val oldLayoutEm = layoutEm
@@ -184,7 +189,7 @@ class DocumentActivity : Activity() {
             if (oldLayoutEm != layoutEm) relayoutDocument()
             true
         }
-        layout_button.setOnClickListener { layoutPopupMenu!!.show() }
+        binding.layoutButton.setOnClickListener { layoutPopupMenu!!.show() }
     }
 
     fun onPageViewSizeChanged(w: Int, h: Int) {
@@ -282,19 +287,19 @@ class DocumentActivity : Activity() {
 
     fun showKeyboard() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-        imm.showSoftInput(search_text, 0)
+        imm.showSoftInput(binding.searchText, 0)
     }
 
     fun hideKeyboard() {
         val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-        imm.hideSoftInputFromWindow(search_text!!.windowToken, 0)
+        imm.hideSoftInputFromWindow(binding.searchText!!.windowToken, 0)
     }
 
     fun resetSearch() {
         stopSearch = true
         searchHitPage = -1
         searchNeedle = null
-        page_view.resetHits()
+        binding.pageView.resetHits()
     }
 
     fun runSearch(startPage: Int, direction: Int, needle: String) {
@@ -321,7 +326,7 @@ class DocumentActivity : Activity() {
 
             override fun run() {
                 if (stopSearch || needle !== searchNeedle) {
-                    page_label.text = "${currentPage + 1} / ${pageCount}"
+                    binding.pageLabel.text = "${currentPage + 1} / ${pageCount}"
                 } else if (searchHitPage == currentPage) {
                     loadPage()
                 } else if (searchHitPage >= 0) {
@@ -329,10 +334,10 @@ class DocumentActivity : Activity() {
                     currentPage = searchHitPage
                     loadPage()
                 } else if (searchPage in 0 until pageCount) {
-                    page_label!!.text = "${searchPage + 1} / ${pageCount}"
+                    binding.pageLabel!!.text = "${searchPage + 1} / ${pageCount}"
                     worker!!.add(this)
                 } else {
-                    page_label!!.text = "${currentPage + 1} / ${pageCount}"
+                    binding.pageLabel!!.text = "${currentPage + 1} / ${pageCount}"
                     Log.i(APP, "search not found")
                     Toast.makeText(
                         this@DocumentActivity,
@@ -348,7 +353,7 @@ class DocumentActivity : Activity() {
         hideKeyboard()
         val startPage = if (searchHitPage == currentPage) currentPage + direction else currentPage
         searchHitPage = -1
-        searchNeedle = search_text.text.toString()
+        searchNeedle = binding.searchText.text.toString()
         if (searchNeedle!!.isEmpty())
             searchNeedle = null
         if (searchNeedle != null && startPage in 0 until pageCount)
@@ -379,11 +384,11 @@ class DocumentActivity : Activity() {
             override fun run() {
                 if (currentPage !in 0 until pageCount)
                     currentPage = 0
-                title_label.text = title
+                binding.titleLabel.text = title
                 if (isReflowable)
-                    layout_button.visibility = View.VISIBLE
+                    binding.layoutButton.visibility = View.VISIBLE
                 else
-                    zoom_button.visibility = View.VISIBLE
+                    binding.zoomButton.visibility = View.VISIBLE
                 loadPage()
                 loadOutline()
             }
@@ -419,11 +424,13 @@ class DocumentActivity : Activity() {
                 for (node in outline) {
                     if (node.title != null) {
                         val outlinePage = doc!!.pageNumberFromLocation(doc!!.resolveLink(node))
-                        flatOutline!!.add(OutlineActivity.Item(
-                            indent + node.title,
-                            node.uri,
-                            outlinePage
-                        ))
+                        flatOutline!!.add(
+                            OutlineActivity.Item(
+                                indent + node.title,
+                                node.uri,
+                                outlinePage
+                            )
+                        )
                     }
 
                     if (node.down != null)
@@ -444,7 +451,7 @@ class DocumentActivity : Activity() {
 
             override fun run() {
                 if (flatOutline != null)
-                    outline_button.visibility = View.VISIBLE
+                    binding.outlineButton.visibility = View.VISIBLE
             }
         })
     }
@@ -487,43 +494,43 @@ class DocumentActivity : Activity() {
 
             override fun run() {
                 if (bitmap != null)
-                    page_view.setBitmap(bitmap, zoom, wentBack, links, hits)
+                    binding.pageView.setBitmap(bitmap, zoom, wentBack, links, hits)
                 else
-                    page_view.setError()
-                page_label.text = "${currentPage + 1} / ${pageCount}"
-                page_seekbar.max = pageCount - 1
-                page_seekbar.progress = pageNumber
+                    binding.pageView.setError()
+                binding.pageLabel.text = "${currentPage + 1} / ${pageCount}"
+                binding.pageSeekbar.max = pageCount - 1
+                binding.pageSeekbar.progress = pageNumber
                 wentBack = false
             }
         })
     }
 
     fun showSearch() {
-        currentBar = search_bar
-        action_bar.visibility = View.GONE
-        search_bar.visibility = View.VISIBLE
-        search_bar.requestFocus()
+        currentBar = binding.searchBar
+        binding.actionBar.visibility = View.GONE
+        binding.searchBar.visibility = View.VISIBLE
+        binding.searchBar.requestFocus()
         showKeyboard()
     }
 
     fun hideSearch() {
-        currentBar = action_bar
-        action_bar.visibility = View.VISIBLE
-        search_bar.visibility = View.GONE
+        currentBar = binding.actionBar
+        binding.actionBar.visibility = View.VISIBLE
+        binding.searchBar.visibility = View.GONE
         hideKeyboard()
         resetSearch()
     }
 
     fun toggleUI() {
-        if (navigation_bar.visibility == View.VISIBLE) {
+        if (binding.navigationBar.visibility == View.VISIBLE) {
             currentBar!!.visibility = View.GONE
-            navigation_bar.visibility = View.GONE
-            if (currentBar === search_bar) hideKeyboard()
+            binding.navigationBar.visibility = View.GONE
+            if (currentBar === binding.searchBar) hideKeyboard()
         } else {
             currentBar!!.visibility = View.VISIBLE
-            navigation_bar.visibility = View.VISIBLE
-            if (currentBar === search_bar) {
-                search_bar.requestFocus()
+            binding.navigationBar.visibility = View.VISIBLE
+            if (currentBar === binding.searchBar) {
+                binding.searchBar.requestFocus()
                 showKeyboard()
             }
         }

@@ -12,20 +12,22 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".FilePickerActivity">
+        <activity
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".MyDocumentActivity" />
-        <activity android:name=".TestRoundPadActivity">
+        <activity android:name=".FilePickerActivity">
         </activity>
-        <activity android:name=".MainActivity">
-        </activity>
+        <activity android:name=".ui.mydocument.MyDocumentActivity" />
+        <activity android:name=".TestRoundPadActivity"></activity>
         <activity
-            android:name=".DocumentActivity"
+            android:name=".old.DocumentActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:hardwareAccelerated="false"
             android:label="MuPDF mini">
@@ -121,7 +123,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".OutlineActivity"
+            android:name=".old.OutlineActivity"
             android:configChanges="orientation|screenSize|keyboardHidden" />
     </application>
 

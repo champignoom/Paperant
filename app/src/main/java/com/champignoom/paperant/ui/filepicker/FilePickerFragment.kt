@@ -1,22 +1,23 @@
-package com.champignoom.paperant
+package com.champignoom.paperant.ui.filepicker
 
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Environment
-import android.os.FileUtils
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
-import android.webkit.MimeTypeMap
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
-import androidx.core.net.toUri
+import androidx.fragment.app.Fragment
+import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import kotlinx.android.synthetic.main.activity_file_picker.*
+import com.champignoom.paperant.ui.mydocument.MyDocumentActivity
+import com.champignoom.paperant.R
+import com.champignoom.paperant.databinding.FragmentFilepickerBinding
 import java.io.File
 import java.util.*
 
@@ -88,29 +89,50 @@ class MyAdapter(var path: String): RecyclerView.Adapter<MyAdapter.MyViewHolder>(
     }
 }
 
-class FilePickerActivity : AppCompatActivity() {
+class FilePickerFragment : Fragment() {
+    private lateinit var filePickerViewModel: FilePickerViewModel
     private lateinit var viewManager: RecyclerView.LayoutManager
     private lateinit var viewAdapter: MyAdapter
-    //    private val dataset = Array(500) {"number $it"}
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_file_picker)
+    private var _binding: FragmentFilepickerBinding? = null
+    private val binding get() = _binding!!
 
-        viewManager = LinearLayoutManager(this)
+    private val onBackPressedCallback = object: OnBackPressedCallback(true) {
+        override fun handleOnBackPressed() {
+            if (!viewAdapter.goBack()) {
+                isEnabled = false
+                requireActivity().onBackPressed()
+            }
+        }
+    }
+
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View {
+        filePickerViewModel =
+            ViewModelProvider(this).get(FilePickerViewModel::class.java)
+        _binding = FragmentFilepickerBinding.inflate(inflater, container, false)
+//        val textView: TextView = root.findViewById(R.id.text_gallery)
+//        galleryViewModel.text.observe(viewLifecycleOwner, Observer {
+//            textView.text = it
+//        })
+//
+        viewManager = LinearLayoutManager(context)
         viewAdapter = MyAdapter(Environment.getExternalStorageDirectory().canonicalPath)
-        recycler_view.apply {
+        binding.recyclerView.apply {
             setHasFixedSize(true)
             layoutManager = viewManager
             adapter = viewAdapter
         }
 
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (!viewAdapter.goBack()) {
-                    isEnabled = false
-                    onBackPressed()
-                }
-            }
-        })
+        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, onBackPressedCallback)
+
+        return binding.root
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        _binding = null
     }
 }

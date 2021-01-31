@@ -1,8 +1,9 @@
-package com.champignoom.paperant
+package com.champignoom.paperant.old
 
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
+import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -182,6 +183,8 @@ class PageView(ctx: Context?, atts: AttributeSet?) :
             tScrollX = (pageFocusX * viewScale - focusX).toInt()
             tScrollY = (pageFocusY * viewScale - focusY).toInt()
             scroller.forceFinished(true)
+
+            Log.d("Paperant", "onScale: viewScale=${viewScale}, bitmapWH=(${bitmapW},${bitmapH}), tScrollXY=(${tScrollX}, ${tScrollY})")
             invalidate()
         }
         return true
@@ -257,8 +260,9 @@ class PageView(ctx: Context?, atts: AttributeSet?) :
             y = -tScrollY
         }
 
-        dst[x, y, x + bitmapW] = y + bitmapH
+        dst.set(x, y, x+bitmapW, y+bitmapH)
         canvas.drawBitmap(bitmap!!, null, dst, null)
+        Log.d("Paperant", "onDraw: dst=(${dst.left}, ${dst.top}, ${dst.right}, ${dst.bottom})")
         if (showLinks) {
             links?.forEach {
                 val b = it.bounds

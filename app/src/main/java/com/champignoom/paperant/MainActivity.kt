@@ -1,52 +1,63 @@
 package com.champignoom.paperant
 
-import android.content.Intent
-import android.graphics.Color
-import android.net.Uri
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.Menu
+import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.navigation.NavigationView
+import androidx.navigation.findNavController
+import androidx.navigation.ui.AppBarConfiguration
+import androidx.navigation.ui.navigateUp
+import androidx.navigation.ui.setupActionBarWithNavController
+import androidx.navigation.ui.setupWithNavController
+import androidx.drawerlayout.widget.DrawerLayout
 import androidx.appcompat.app.AppCompatActivity
-import kotlinx.android.synthetic.main.activity_main.*
-import kotlinx.android.synthetic.main.activity_test_round_pad.*
-
-import java.io.File
-import java.util.*
-
+import androidx.appcompat.widget.Toolbar
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity() {
+
+    private lateinit var appBarConfiguration: AppBarConfiguration
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        val toolbar: Toolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
 
-        val uri = Uri.parse("file:///storage/emulated/0/Download/slides.pdf")
-        button.setOnClickListener { openPdfFile(uri) }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED)
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), 42)
 
-//        button2.alpha = 0.5f
-
-//        test_view.setBackgroundColor(Color.CYAN)
-//        test_view.alpha = 0.5f
-//        test_view.setOnTouchListener { v, event ->
-//            if (false) v.performClick()
-//
-//            text_view.text = "${event.x}, ${event.y}"
-//            true
-//        }
-
-        var v = 0.0
-        test_view.onDeltaListener = {
-            v += it
-            text_view.text = "$v"
+        val fab: FloatingActionButton = findViewById(R.id.fab)
+        fab.setOnClickListener { view ->
+            Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
+                .setAction("Action", null).show()
         }
+        val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
+        val navView: NavigationView = findViewById(R.id.nav_view)
+        val navController = findNavController(R.id.nav_host_fragment)
+        // Passing each menu ID as a set of Ids because each
+        // menu should be considered as top level destinations.
+        appBarConfiguration = AppBarConfiguration(
+            setOf(
+                R.id.nav_recent, R.id.nav_filepicker, R.id.nav_slideshow
+            ), drawerLayout
+        )
+        setupActionBarWithNavController(navController, appBarConfiguration)
+        navView.setupWithNavController(navController)
     }
 
-    private fun openPdfFile(uri: Uri) {
-        val file = File(uri.path!!)
-        text_view.text = Date(file.lastModified()).toString()
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        menuInflater.inflate(R.menu.main, menu)
+        return true
+    }
 
-        val intent = Intent(this, MyDocumentActivity::class.java).apply {
-            action = Intent.ACTION_VIEW
-            data = uri
-        }
-        startActivity(intent)
+    override fun onSupportNavigateUp(): Boolean {
+        val navController = findNavController(R.id.nav_host_fragment)
+        return navController.navigateUp(appBarConfiguration) || super.onSupportNavigateUp()
     }
 }
-

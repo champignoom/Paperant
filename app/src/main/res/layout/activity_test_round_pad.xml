@@ -16,7 +16,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <com.champignoom.round_pad.RoundPad
+    <com.champignoom.round_pad.RoundPadView
         android:id="@+id/roundPad"
         android:layout_width="40dp"
         android:layout_height="40dp"
