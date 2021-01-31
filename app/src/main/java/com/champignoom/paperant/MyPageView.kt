@@ -1,15 +1,14 @@
 package com.champignoom.paperant
 
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
 import android.content.Context
 import android.graphics.*
-import android.graphics.drawable.TransitionDrawable
 import android.os.SystemClock
 import android.util.AttributeSet
+import android.util.Log
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
 import android.widget.FrameLayout
@@ -22,9 +21,13 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
     companion object {
         const val NOT_WAITING = -1
         private fun timestamp() = SystemClock.uptimeMillis()
+        const val PAGE_DELTA_WIDTH = 1/8f
     }
 
-    private val mMyPageView  = ImageView(ctx).also { addView(it, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT) }
+    private val mMyPageView  = ImageView(ctx).also {
+        it.scaleType = ImageView.ScaleType.MATRIX
+        addView(it, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+    }
     private val mBlurredImage = ImageView(ctx).also { addView(it, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT) }
     private val mProgressBar = ProgressBar(ctx).also { addView(it, LayoutParams(150, 150, Gravity.CENTER)) }
 
@@ -33,21 +36,41 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
 
     var maxAnimationDurationMs = 100L
 
+    private var pageMatrix = Matrix()
+
     var onPageDeltaClicked: ((Int) -> Unit)? = null
     var onSizeListener: ((w: Int, h: Int) -> Unit)? = null
 
-    val gestureDetector = GestureDetectorCompat(context, object: GestureDetector.SimpleOnGestureListener() {
+    private val turnOnePageDetector = GestureDetectorCompat(context, object: GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent): Boolean {
             when {
-                e.x < width/3 -> onPageDeltaClicked?.invoke(-1)
-                e.x > width*2/3 -> onPageDeltaClicked?.invoke(1)
+                e.x < width * PAGE_DELTA_WIDTH -> onPageDeltaClicked?.invoke(-1)
+                e.x > width * (1 - PAGE_DELTA_WIDTH) -> onPageDeltaClicked?.invoke(1)
+                else -> return false
             }
             return true
         }
     })
 
+    private val scaleDetector = ScaleGestureDetector(context, object: ScaleGestureDetector.OnScaleGestureListener {
+        override fun onScaleBegin(detector: ScaleGestureDetector) = true
+
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            Log.d("Paperant", "onScale: factor=${detector.scaleFactor}, position=(${detector.focusX}, ${detector.focusY})")
+            if (!isLoading()) {
+                val factor = detector.scaleFactor
+                pageMatrix.postScale(factor, factor, detector.focusX, detector.focusY)
+//                pageMatrix.postScale(2f, 2f)
+                mMyPageView.imageMatrix = pageMatrix
+            }
+            return true
+        }
+
+        override fun onScaleEnd(detector: ScaleGestureDetector?) { }
+    })
+
     override fun onTouchEvent(e: MotionEvent): Boolean {
-        return gestureDetector.onTouchEvent(e)
+        return turnOnePageDetector.onTouchEvent(e) || scaleDetector.onTouchEvent(e)
     }
 
     private fun resetBlurred() {
