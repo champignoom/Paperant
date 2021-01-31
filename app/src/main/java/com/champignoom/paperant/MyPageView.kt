@@ -5,41 +5,48 @@ import android.graphics.*
 import android.os.SystemClock
 import android.util.AttributeSet
 import android.util.Log
-import android.view.GestureDetector
-import android.view.Gravity
-import android.view.MotionEvent
-import android.view.ScaleGestureDetector
+import android.util.Size
+import android.view.*
 import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
+import androidx.core.graphics.scaleMatrix
 import androidx.core.view.GestureDetectorCompat
+import kotlin.math.max
 import kotlin.math.min
 
 class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, atts) {
     companion object {
-        const val NOT_WAITING = -1
         private fun timestamp() = SystemClock.uptimeMillis()
         const val PAGE_DELTA_WIDTH = 1/8f
+        const val FACTOR_STEP = 1.1f
     }
 
+    private val mBlurredImage = ImageView(ctx).also { addView(it, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT) }
     private val mMyPageView  = ImageView(ctx).also {
         it.scaleType = ImageView.ScaleType.MATRIX
         addView(it, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
     }
-    private val mBlurredImage = ImageView(ctx).also { addView(it, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT) }
     private val mProgressBar = ProgressBar(ctx).also { addView(it, LayoutParams(150, 150, Gravity.CENTER)) }
 
-    private var waitingPageNum: Int = NOT_WAITING
     private var lastTimestampMs = 0L
 
     var maxAnimationDurationMs = 100L
 
     private var pageMatrix = Matrix()
+    private var bitmapPrecision = 1f
+    private var bitmapPrecisionPending = 1f  // pending scale before finishing loading
+
+    private val pageMatrixValueBuffer = FloatArray(9)
+    private fun scaleFactor(): Float {
+        pageMatrix.getValues(pageMatrixValueBuffer)
+        return pageMatrixValueBuffer[Matrix.MSCALE_X]  // assume same scale for x, y
+    }
 
     var onPageDeltaClicked: ((Int) -> Unit)? = null
-    var onSizeListener: ((w: Int, h: Int) -> Unit)? = null
+    var reloader: ((w: Int, h: Int) -> Unit)? = null
 
     private val turnOnePageDetector = GestureDetectorCompat(context, object: GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent): Boolean {
@@ -58,10 +65,20 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             Log.d("Paperant", "onScale: factor=${detector.scaleFactor}, position=(${detector.focusX}, ${detector.focusY})")
             if (!isLoading()) {
-                val factor = detector.scaleFactor
-                pageMatrix.postScale(factor, factor, detector.focusX, detector.focusY)
-//                pageMatrix.postScale(2f, 2f)
+                val currentFactor = scaleFactor()
+                val deltaFactor = min(detector.scaleFactor, 3f / (bitmapPrecision * currentFactor))
+                if (deltaFactor == 1f)
+                    return true
+
+                pageMatrix.postScale(deltaFactor, deltaFactor, detector.focusX, detector.focusY)
                 mMyPageView.imageMatrix = pageMatrix
+
+                if (currentFactor > bitmapPrecisionPending) {
+                    while (bitmapPrecisionPending < currentFactor)
+                        bitmapPrecisionPending *= FACTOR_STEP
+                    val newPrecision = bitmapPrecision * bitmapPrecisionPending
+                    reloader?.invoke((width*newPrecision).toInt(), (height*newPrecision).toInt())
+                }
             }
             return true
         }
@@ -69,31 +86,43 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
         override fun onScaleEnd(detector: ScaleGestureDetector?) { }
     })
 
-    override fun onTouchEvent(e: MotionEvent): Boolean {
-        return turnOnePageDetector.onTouchEvent(e) || scaleDetector.onTouchEvent(e)
-    }
-
-    private fun resetBlurred() {
-        mBlurredImage.animation = null
-        mBlurredImage.apply {
-            setImageDrawable(null)
-            alpha = 1f
-            visibility = GONE
+    private val moveDetector = GestureDetector(context, object: GestureDetector.SimpleOnGestureListener() {
+        override fun onDown(e: MotionEvent?): Boolean {
+            return true
         }
+        override fun onScroll(e1: MotionEvent, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
+            if (!isLoading()) {
+                pageMatrix.postTranslate(-distanceX, -distanceY)
+                mMyPageView.imageMatrix = pageMatrix
+            }
+            return true
+        }
+    })
+
+    fun canvasSize() = Size(width, height)
+
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        turnOnePageDetector.onTouchEvent(e)
+        scaleDetector.onTouchEvent(e)
+        moveDetector.onTouchEvent(e)
+        return true
     }
 
     fun isLoading() =
         mProgressBar.visibility == VISIBLE
 
-    // not threadsafe
-    fun setLoading(pageNum: Int, blurredBitmap: Bitmap?) {
-        waitingPageNum = pageNum
-        mMyPageView.setImageDrawable(null)
+    // UI thread
+    fun setLoading(blurredBitmap: Bitmap?) {
+        mMyPageView.apply {
+            setImageDrawable(null)
+            clearAnimation()
+            alpha = 1f
+        }
         mProgressBar.visibility = VISIBLE
-        resetBlurred()
         if (blurredBitmap != null) {
             mBlurredImage.setImageBitmap(blurredBitmap)
-            mBlurredImage.visibility = VISIBLE
+        } else {
+            mBlurredImage.setImageDrawable(null)
         }
         lastTimestampMs = timestamp()
     }
@@ -102,22 +131,32 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
 //    private fun isProperAnimationEnd(timestamp: Long) = timestamp == animationTokenTimestamp
 
     private fun animateBlurred(durationMs: Long) {
-        mBlurredImage.startAnimation(AlphaAnimation(1f, 0f).apply {
-            duration = durationMs
-            setAnimationListener(object: Animation.AnimationListener {
-                override fun onAnimationStart(animation: Animation) { }
-                override fun onAnimationRepeat(animation: Animation?) { }
-                override fun onAnimationEnd(animation: Animation?) {
-                    resetBlurred()
-                }
-            })
-        })
+        mMyPageView.alpha = 0f
+        mMyPageView.animate().alpha(1f).setDuration(durationMs)
     }
 
-    fun morphToFull(pageNum: Int, bitmap: Bitmap) {
-        if (pageNum != waitingPageNum) return
+    fun getBitmapPrecision(bitmap: Bitmap): Float =
+        max(1f * bitmap.width /  mMyPageView.width, 1f * bitmap.height / mMyPageView.height)
 
-        waitingPageNum = NOT_WAITING  // method applys only after loading
+    // UI thread
+    fun setLoaded(bitmap: Bitmap, preserveMatrix: Boolean) {
+        val oldBitmapPrecision = bitmapPrecision
+        bitmapPrecision = getBitmapPrecision(bitmap)
+
+        if (preserveMatrix) {
+            val deltaFactor = oldBitmapPrecision / bitmapPrecision
+            pageMatrix.preScale(deltaFactor, deltaFactor)
+        } else {
+            val scale = 1f / bitmapPrecision
+            pageMatrix = scaleMatrix(scale, scale)
+            pageMatrix.postTranslate(
+                (mMyPageView.width - scale * bitmap.width) / 2,
+                (mMyPageView.height - scale * bitmap.height) / 2
+            )
+        }
+
+        bitmapPrecisionPending = 1f
+        mMyPageView.imageMatrix = pageMatrix
         mMyPageView.setImageBitmap(bitmap)
         val wasLoading = isLoading()
         mProgressBar.visibility = GONE
@@ -125,12 +164,10 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
         if (wasLoading && mBlurredImage.drawable != null) {
             val msElapsed = timestamp() - lastTimestampMs
             animateBlurred(min(msElapsed/2, maxAnimationDurationMs))
-        } else {
-            resetBlurred()
         }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        onSizeListener?.invoke(w, h)
+        reloader?.invoke(w, h)
     }
 }

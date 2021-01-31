@@ -1,9 +1,7 @@
-    package com.champignoom.paperant.ui.mydocument
+package com.champignoom.paperant.ui.mydocument
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.drawable.TransitionDrawable
 import android.os.Bundle
 import android.renderscript.Allocation
 import android.renderscript.Element
@@ -11,20 +9,16 @@ import android.renderscript.RenderScript
 import android.renderscript.ScriptIntrinsicBlur
 import android.util.Log
 import android.util.Size
-import android.view.GestureDetector
-import android.view.ScaleGestureDetector
-import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.util.component1
-import androidx.core.util.component2
 import androidx.lifecycle.lifecycleScope
 import com.artifex.mupdf.fitz.Document
+import com.artifex.mupdf.fitz.PDFDocument
+import com.artifex.mupdf.fitz.PDFPage
+import com.artifex.mupdf.fitz.Page
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import com.champignoom.paperant.MyDatabase
-import com.champignoom.paperant.R
 import com.champignoom.paperant.databinding.ActivityMyDocumentBinding
 import com.champignoom.paperant.ui.recent.RecentItem
-import kotlinx.android.synthetic.main.activity_my_document.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.newSingleThreadContext
 import java.io.ByteArrayOutputStream
@@ -34,78 +28,108 @@ import java.util.concurrent.LinkedBlockingDeque
 class MyDocumentActivity : AppCompatActivity() {
     companion object {
         const val BLUR_RADIUS = 15f
+//        const val MIN_CACHE_BITMAP_SIZE = 1200  // px
     }
 
     private var blurredCache: MutableMap<Int, ByteArray> = mutableMapOf()
 
-    private var pageQueue = LinkedBlockingDeque<Int>()
+    private var tokenQueue = LinkedBlockingDeque<PageToken>()
 
     private lateinit var binding: ActivityMyDocumentBinding
     private lateinit var viewModel: MyDocumentViewModel
-
-    // used both in UI thread and in background rendering thread, therefore needs locking
-    private var viewSize = Size(-1, -1)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMyDocumentBinding.inflate(layoutInflater)
         setContentView(binding.root)
         val uri = intent.data ?: return
-        viewModel = MyDocumentViewModel(Document.openDocument(uri.path)) // TODO: asynchronous loading
+        viewModel =
+            MyDocumentViewModel(Document.openDocument(uri.path) as PDFDocument) // TODO: asynchronous loading
 
         // TODO: better threading
         lifecycleScope.launch(newSingleThreadContext("databaseThread")) {
-            MyDatabase.getInstance(this@MyDocumentActivity).recentItemDao.insert(RecentItem(
-                Instant.now().toEpochMilli(),
-                uri.toString(),
-                "",
-            ))
+            MyDatabase.getInstance(this@MyDocumentActivity).recentItemDao.insert(
+                RecentItem(
+                    Instant.now().toEpochMilli(),
+                    uri.toString(),
+                    "",
+                )
+            )
         }
 
         binding.pageView.apply {
-            onSizeListener = fun (w, h) {
-                synchronized(viewSize) { viewSize = Size(w, h) }
-                if (viewModel.currentPage < 0)  // initialization
-                    viewModel.currentPage = 0
-                showPage()
+            reloader = fun(w, h) {
+                showPage(PageToken(viewModel.token?.pageNum ?: 0, Size(w, h)))
             }
 
-            onPageDeltaClicked = fun (delta) {
-                val newPageNum = viewModel.currentPage + delta
-                if (newPageNum !in 0 until viewModel.numPage) return
-                showPage(newPageNum)
-            }
+            onPageDeltaClicked = ::onPageDelta
         }
 
-        round_pad.init(4.0, viewModel.numPage - 1.0, 0)
-        round_pad.onDeltaListener = fun (delta) {
-            val newPageNum = (viewModel.currentPage + delta).coerceIn(0, viewModel.numPage)
-            if (newPageNum != viewModel.currentPage) {
-                showPage(newPageNum)
-            }
-        }
+        binding.roundPad.setStep(4.0, viewModel.numPage.toDouble())
+        binding.roundPad.onDeltaListener = ::onPageDelta
 
         lifecycleScope.launch(newSingleThreadContext("backgroundRendererThread")) {
             renderPagesInBackground()
         }
     }
 
-    // supposed to be called in the UI thread
-    private fun showPage(pageNum: Int = viewModel.currentPage) {
-        viewModel.currentPage = pageNum
-        binding.pageView.setLoading(pageNum, blurredCache[pageNum]?.let {decompressBitmap(it)})
-        pageQueue.addLast(pageNum)
+    private fun onPageDelta(delta: Int) {
+        val oldPageNum = viewModel.token!!.pageNum
+        val newPageNum = (oldPageNum + delta).coerceIn(0 until viewModel.numPage)
+        if (oldPageNum != newPageNum) {
+            showPage(PageToken(newPageNum, binding.pageView.canvasSize()))
+        }
     }
+
+    // UI thread
+    private fun setLoading(token: PageToken, blurredBitmap: Bitmap?) {
+    }
+
+    // UI thread
+    private fun setLoaded(token: PageToken, page: PDFPage, fullBitmap: Bitmap) {
+        if (viewModel.token != token) return
+        val pageNotReloaded = viewModel.currentPage != null
+        viewModel.setCurrentConfig(token, page, fullBitmap)
+        binding.pageView.setLoaded(fullBitmap, preserveMatrix = pageNotReloaded)
+    }
+
+    // supposed to be called in the UI thread
+    private fun showPage(token: PageToken) {
+        if (viewModel.getBitmapByToken(token) != null)
+            return
+
+        val page = viewModel.getPage(token.pageNum)
+        if (page == null) {
+            val placeholderBitmap = blurredCache[token.pageNum]?.let { decompressBitmap(it) }
+            binding.pageView.setLoading(placeholderBitmap)
+        } // otherwise assume that a bitmap is already shown
+
+        viewModel.setCurrentConfig(token, page, null)
+        tokenQueue.addLast(token)
+    }
+
+//    private fun bitmapCachable(bitmap: Bitmap) =
+//        max(bitmap.width, bitmap.height) >= MIN_CACHE_BITMAP_SIZE
+//
+//    private fun toCacheSize(bitmap: Bitmap): Bitmap {
+//        val f = MIN_CACHE_BITMAP_SIZE.toDouble() / max(bitmap.width, bitmap.height)
+//        return Bitmap.createScaledBitmap(bitmap, (bitmap.width*f).toInt(), (bitmap.height*f).toInt(), true)
+//    }
 
     private fun renderPagesInBackground() {
         while (true) {
-            val pageNum = pageQueue.takeLast()
+            val token = tokenQueue.takeLast()
+            val (pageNum, size) = token
 
             // viewModel.currentPage must either ==pageNum or present later in the queue
-            if (pageNum in blurredCache && pageNum != viewModel.currentPage) continue
+            if (pageNum in blurredCache && token.pageNum != viewModel.token?.pageNum) continue
 
-            val bitmap = loadPage(pageNum)
-            runOnUiThread { binding.pageView.morphToFull(pageNum, bitmap) }
+            val page = viewModel.getPage(pageNum) ?: (viewModel.doc.loadPage(pageNum) as PDFPage)
+            Log.d("Paperant", "rendering with size ${size}")
+            val ctm = AndroidDrawDevice.fitPage(page, size.width, size.height)
+            val bitmap = AndroidDrawDevice.drawPage(page, ctm)
+
+            runOnUiThread { setLoaded(token, page, bitmap) }
             if (pageNum !in blurredCache) {
                 blurredCache[pageNum] = compressBitmap(blurredImage(bitmap))
             }
@@ -141,11 +165,11 @@ class MyDocumentActivity : AppCompatActivity() {
         BitmapFactory.decodeByteArray(b, 0, b.size)
 
 
-    private fun loadPage(pageNum: Int): Bitmap {
-        Log.i("Paperant", "loadPage ${pageNum}")
+    private fun loadPage(token: PageToken): Bitmap {
+        Log.i("Paperant", "loadPage ${token.pageNum}")
+        val (pageNum, size) = token
         val page = viewModel.doc.loadPage(pageNum)
-        val (w, h) = synchronized(viewSize) {viewSize}
-        val ctm = AndroidDrawDevice.fitPage(page, w, h)
+        val ctm = AndroidDrawDevice.fitPage(page, size.width, size.height)
         return AndroidDrawDevice.drawPage(page, ctm)
     }
 }

@@ -39,7 +39,7 @@ class MyAdapter(var path: String): RecyclerView.Adapter<MyAdapter.MyViewHolder>(
                     backStack.push(it.canonicalPath)
                     setDirectory(it.canonicalPath)
                 }
-                it.name.run {substring(lastIndexOf('.').coerceAtLeast(0)).decapitalize(Locale.getDefault()) in arrayOf(".pdf", ".epub")} -> {
+                it.name.run {substring(lastIndexOf('.').coerceAtLeast(0)).decapitalize(Locale.getDefault()) in arrayOf(".pdf",/* ".epub"*/)} -> {
                     parent.context.startActivity(Intent(parent.context, MyDocumentActivity::class.java).apply {
                         action = Intent.ACTION_VIEW
                         data = Uri.fromFile(it)

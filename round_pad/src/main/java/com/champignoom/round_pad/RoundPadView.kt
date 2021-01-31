@@ -28,19 +28,13 @@ class RoundPadView(context: Context, attrs: AttributeSet): View(context, attrs) 
 
     var residual = 0.0
 
-    fun init(minStep: Double, maxStep: Double, startPosition: Int) {
+    fun setStep(minStep: Double, maxStep: Double) {
         if (minStep > maxStep) {
             throw IllegalArgumentException("empty step range: [${minStep}, ${maxStep}]")
         }
 
         this.minStep = minStep
         this.maxStep = maxStep
-    }
-
-    fun setRange(newMinValue: Int, newMaxValue: Int) {
-    }
-
-    fun setStep(newMinStep: Double, newMaxStep: Double) {
     }
 
 //    val paint: Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
