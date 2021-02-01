@@ -7,12 +7,12 @@ import android.util.AttributeSet
 import android.util.Log
 import android.util.Size
 import android.view.*
-import android.view.animation.AlphaAnimation
-import android.view.animation.Animation
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
 import androidx.core.graphics.scaleMatrix
+import androidx.core.graphics.times
+import androidx.core.graphics.transform
 import androidx.core.view.GestureDetectorCompat
 import kotlin.math.max
 import kotlin.math.min
@@ -22,6 +22,7 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
         private fun timestamp() = SystemClock.uptimeMillis()
         const val PAGE_DELTA_WIDTH = 1/8f
         const val FACTOR_STEP = 1.1f
+        const val MAX_SCALE_FACTOR = 3f
     }
 
     private val mBlurredImage = ImageView(ctx).also { addView(it, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT) }
@@ -35,14 +36,15 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
 
     var maxAnimationDurationMs = 100L
 
-    private var pageMatrix = Matrix()
+    private var overallMatrix = Matrix()
     private var bitmapPrecision = 1f
     private var bitmapPrecisionPending = 1f  // pending scale before finishing loading
+    private var bitmapSize = Size(0, 0)
 
-    private val pageMatrixValueBuffer = FloatArray(9)
+    private val overallMatrixValueBuffer = FloatArray(9)
     private fun scaleFactor(): Float {
-        pageMatrix.getValues(pageMatrixValueBuffer)
-        return pageMatrixValueBuffer[Matrix.MSCALE_X]  // assume same scale for x, y
+        overallMatrix.getValues(overallMatrixValueBuffer)
+        return overallMatrixValueBuffer[Matrix.MSCALE_X]  // assume same scale for x, y
     }
 
     var onPageDeltaClicked: ((Int) -> Unit)? = null
@@ -66,12 +68,15 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
             Log.d("Paperant", "onScale: factor=${detector.scaleFactor}, position=(${detector.focusX}, ${detector.focusY})")
             if (!isLoading()) {
                 val currentFactor = scaleFactor()
-                val deltaFactor = min(detector.scaleFactor, 3f / (bitmapPrecision * currentFactor))
+                val currentVisualFactor = scaleFactor() * bitmapPrecision
+                val deltaFactor = detector.scaleFactor.coerceIn(1f / currentVisualFactor, MAX_SCALE_FACTOR / currentVisualFactor)
+                Log.d("Paperant", "onScale coersed = ${deltaFactor}")
                 if (deltaFactor == 1f)
                     return true
 
-                pageMatrix.postScale(deltaFactor, deltaFactor, detector.focusX, detector.focusY)
-                mMyPageView.imageMatrix = pageMatrix
+                overallMatrix.postScale(deltaFactor, deltaFactor, detector.focusX, detector.focusY)
+                reifyMatrix(overallMatrix)
+                mMyPageView.imageMatrix = overallMatrix
 
                 if (currentFactor > bitmapPrecisionPending) {
                     while (bitmapPrecisionPending < currentFactor)
@@ -86,14 +91,35 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
         override fun onScaleEnd(detector: ScaleGestureDetector?) { }
     })
 
+    private fun reifyMatrix(m: Matrix) {
+        val visualRect = RectF(0f, 0f, bitmapSize.width.toFloat(), bitmapSize.height.toFloat()).transform(m)
+        Log.d("Paperant", "reified: ${visualRect}, width=${width}, height=${height}")
+
+        // at most one of two sides of + could be non zero when the visual scale >=1f
+        val dx =
+            if (visualRect.width() < mMyPageView.width)
+                mMyPageView.width/2f - visualRect.centerX()
+            else
+                min(0f, -visualRect.left) + max(0f, width - visualRect.right)
+        val dy =
+            if (visualRect.height() < mMyPageView.height)
+                mMyPageView.height/2f - visualRect.centerY()
+            else
+                min(0f, -visualRect.top) + max(0f, height - visualRect.bottom)
+
+        Log.d("Paperant", "reify: dx=${dx}, dy=${dy}")
+        m.postTranslate(dx, dy)
+    }
+
     private val moveDetector = GestureDetector(context, object: GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent?): Boolean {
             return true
         }
         override fun onScroll(e1: MotionEvent, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
             if (!isLoading()) {
-                pageMatrix.postTranslate(-distanceX, -distanceY)
-                mMyPageView.imageMatrix = pageMatrix
+                overallMatrix.postTranslate(-distanceX, -distanceY)
+                reifyMatrix(overallMatrix)
+                mMyPageView.imageMatrix = overallMatrix
             }
             return true
         }
@@ -142,21 +168,22 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
     fun setLoaded(bitmap: Bitmap, preserveMatrix: Boolean) {
         val oldBitmapPrecision = bitmapPrecision
         bitmapPrecision = getBitmapPrecision(bitmap)
+        bitmapPrecisionPending = 1f
+        bitmapSize = Size(bitmap.width, bitmap.height)
 
         if (preserveMatrix) {
             val deltaFactor = oldBitmapPrecision / bitmapPrecision
-            pageMatrix.preScale(deltaFactor, deltaFactor)
+            overallMatrix.preScale(deltaFactor, deltaFactor)
         } else {
             val scale = 1f / bitmapPrecision
-            pageMatrix = scaleMatrix(scale, scale)
-            pageMatrix.postTranslate(
+            overallMatrix = scaleMatrix(scale, scale)
+            overallMatrix.postTranslate(
                 (mMyPageView.width - scale * bitmap.width) / 2,
                 (mMyPageView.height - scale * bitmap.height) / 2
             )
         }
 
-        bitmapPrecisionPending = 1f
-        mMyPageView.imageMatrix = pageMatrix
+        mMyPageView.imageMatrix = overallMatrix
         mMyPageView.setImageBitmap(bitmap)
         val wasLoading = isLoading()
         mProgressBar.visibility = GONE
