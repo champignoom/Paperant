@@ -91,22 +91,19 @@ class MyPageViewWithBlur(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, at
         override fun onScaleEnd(detector: ScaleGestureDetector?) { }
     })
 
+    private fun deltaReifyBound(span: Float, a: Float, b: Float) =
+        if (b-a < span)  // has margin
+            (span - (a+b)) * 0.5f  // to center
+        else
+            min(0f, -a) + max(0f, span - b)  // clear magin
+
     private fun reifyMatrix(m: Matrix) {
         val visualRect = RectF(0f, 0f, bitmapSize.width.toFloat(), bitmapSize.height.toFloat()).transform(m)
         Log.d("Paperant", "reified: ${visualRect}, width=${width}, height=${height}")
 
         // at most one of two sides of + could be non zero when the visual scale >=1f
-        val dx =
-            if (visualRect.width() < mMyPageView.width)
-                mMyPageView.width/2f - visualRect.centerX()
-            else
-                min(0f, -visualRect.left) + max(0f, width - visualRect.right)
-        val dy =
-            if (visualRect.height() < mMyPageView.height)
-                mMyPageView.height/2f - visualRect.centerY()
-            else
-                min(0f, -visualRect.top) + max(0f, height - visualRect.bottom)
-
+        val dx = deltaReifyBound(mMyPageView.width.toFloat(), visualRect.left, visualRect.right)
+        val dy = deltaReifyBound(mMyPageView.height.toFloat(), visualRect.top, visualRect.bottom)
         Log.d("Paperant", "reify: dx=${dx}, dy=${dy}")
         m.postTranslate(dx, dy)
     }
