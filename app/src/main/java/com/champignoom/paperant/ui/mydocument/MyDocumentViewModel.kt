@@ -10,8 +10,9 @@ import com.artifex.mupdf.fitz.Page
 
 data class PageToken(val pageNum: Int, val size: Size)
 
-class MyDocumentViewModel(var doc: PDFDocument): ViewModel() {
-    val numPage = doc.countPages()
+class MyDocumentViewModel: ViewModel() {
+    var doc: PDFDocument? = null
+    var numPage: Int = 0
     var token: PageToken? = null
     var currentPage: PDFPage? = null
     var currentBitmap: Bitmap? = null

@@ -9,6 +9,7 @@ import android.renderscript.RenderScript
 import android.renderscript.ScriptIntrinsicBlur
 import android.util.Log
 import android.util.Size
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.artifex.mupdf.fitz.Document
@@ -36,15 +37,17 @@ class MyDocumentActivity : AppCompatActivity() {
     private var tokenQueue = LinkedBlockingDeque<PageToken>()
 
     private lateinit var binding: ActivityMyDocumentBinding
-    private lateinit var viewModel: MyDocumentViewModel
+    private val viewModel: MyDocumentViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMyDocumentBinding.inflate(layoutInflater)
         setContentView(binding.root)
         val uri = intent.data ?: return
-        viewModel =
-            MyDocumentViewModel(Document.openDocument(uri.path) as PDFDocument) // TODO: asynchronous loading
+        if (viewModel.doc == null) {
+            viewModel.doc = Document.openDocument(uri.path) as PDFDocument // TODO: asynchronous loading
+            viewModel.numPage = viewModel.doc!!.countPages()
+        }
 
         // TODO: better threading
         lifecycleScope.launch(newSingleThreadContext("databaseThread")) {
@@ -124,7 +127,7 @@ class MyDocumentActivity : AppCompatActivity() {
             // viewModel.currentPage must either ==pageNum or present later in the queue
             if (pageNum in blurredCache && token.pageNum != viewModel.token?.pageNum) continue
 
-            val page = viewModel.getPage(pageNum) ?: (viewModel.doc.loadPage(pageNum) as PDFPage)
+            val page = viewModel.getPage(pageNum) ?: (viewModel.doc!!.loadPage(pageNum) as PDFPage)
             Log.d("Paperant", "rendering with size ${size}")
             val ctm = AndroidDrawDevice.fitPage(page, size.width, size.height)
             val bitmap = AndroidDrawDevice.drawPage(page, ctm)
@@ -163,13 +166,4 @@ class MyDocumentActivity : AppCompatActivity() {
 
     private fun decompressBitmap(b: ByteArray) =
         BitmapFactory.decodeByteArray(b, 0, b.size)
-
-
-    private fun loadPage(token: PageToken): Bitmap {
-        Log.i("Paperant", "loadPage ${token.pageNum}")
-        val (pageNum, size) = token
-        val page = viewModel.doc.loadPage(pageNum)
-        val ctm = AndroidDrawDevice.fitPage(page, size.width, size.height)
-        return AndroidDrawDevice.drawPage(page, ctm)
-    }
 }
