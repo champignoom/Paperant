@@ -37,3 +37,26 @@ Flow:
      + `AndroidDrawDevice::drawPage` !!
      - `PageView::setBitmap` -> `View::invalidate` -> `PageView::onDraw`
       + `Canvas::drawBitmap`
+
+## Asynchrony issues
+
+The naive way is to render a page each time when user turns the page.
+The problem is that, when the user span a large range of pages,
+the time span between two adjacent turning of page is hardly ever sufficient
+for rendering.
+
+Current solution is to use a background rendering thread equipped with a stack of page numbers.
+When the user requests a new page, it is pushed on top of the stack.
+The previous top page of the stack is wasted (which could be mitigated by the use of blurred cache),
+but once it is finished, the current page starts to be processed.
+
+But it takes a ton of work to convince oneself that the wasted rendering would not jeopardize the logic.
+It is also reasonable to assume that a reasonable user do not operate too often when s/he has a proper task to achieve.
+
+The other way, which is definitely the better way in my opinion, is to really kill the unused rendering thread.
+Unfortunately, java do not support this, and there are random justifications for this out there.
+Fortunately, pthread has this, and android ndk supports pthread.
+That would however require additional efforts to write c code and porting. 
+
+command used for building the native library for unit test on host:
+`gcc -shared -fPIC -g -o app/build/intermediates/stripped_native_libs/debug/out/lib/x86_64/libkillable-thread.so -I/usr/lib/jvm/java-8-openjdk/include -I/usr/lib/jvm/java-8-openjdk/include/linux app/src//main//cpp//killable-thread.c`

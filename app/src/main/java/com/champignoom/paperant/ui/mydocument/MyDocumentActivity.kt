@@ -12,10 +12,7 @@ import android.util.Size
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.artifex.mupdf.fitz.Document
-import com.artifex.mupdf.fitz.PDFDocument
-import com.artifex.mupdf.fitz.PDFPage
-import com.artifex.mupdf.fitz.Page
+import com.artifex.mupdf.fitz.*
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import com.champignoom.paperant.MyDatabase
 import com.champignoom.paperant.databinding.ActivityMyDocumentBinding
@@ -128,6 +125,23 @@ class MyDocumentActivity : AppCompatActivity() {
             if (pageNum in blurredCache && token.pageNum != viewModel.token?.pageNum) continue
 
             val page = viewModel.getPage(pageNum) ?: (viewModel.doc!!.loadPage(pageNum) as PDFPage)
+
+            page.createAnnotation(PDFAnnotation.TYPE_INK).apply {
+                color = floatArrayOf(1f, 0f, 0f)
+                border = 20f
+                addInkListStroke()
+                addInkListStrokeVertex(100f, 200f)
+                addInkListStrokeVertex(300f, 400f)
+            }
+            page.createAnnotation(PDFAnnotation.TYPE_INK).apply {
+                color = floatArrayOf(0f, 0f, 1f)
+                border = 10f
+                addInkListStroke()
+                addInkListStrokeVertex(100f, 200f)
+                addInkListStrokeVertex(300f, 400f)
+            }
+            Log.d("Paperant", "annotation count = ${page.annotations.size}")
+
             Log.d("Paperant", "rendering with size ${size}")
             val ctm = AndroidDrawDevice.fitPage(page, size.width, size.height)
             val bitmap = AndroidDrawDevice.drawPage(page, ctm)
