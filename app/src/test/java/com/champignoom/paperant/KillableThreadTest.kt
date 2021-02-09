@@ -1,7 +1,5 @@
 package com.champignoom.paperant
 
-import android.util.Log
-import org.junit.Assert.assertEquals
 import org.junit.Test
 import kotlin.concurrent.thread
 
@@ -29,7 +27,7 @@ class KillableThreadTest {
                 }
             }
         }
-        t.run()
+        t.start()
 //        Thread.sleep(1000)
         Thread.sleep(3000)
         t.stop()

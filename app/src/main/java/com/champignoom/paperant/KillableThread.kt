@@ -1,5 +1,10 @@
 package com.champignoom.paperant
 
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import java.lang.RuntimeException
+
 abstract class KillableThread {
     companion object {
         private const val THREAD_SLOW_STARTED = 1
@@ -9,13 +14,17 @@ abstract class KillableThread {
         init {
             System.loadLibrary("killable-thread")
             bindFieldAccessors()
+            initSignalHandler()
         }
 
         private external fun bindFieldAccessors()
+        private external fun initSignalHandler()
     }
 
     private var threadHandle: Long = 0;
     private var threadState: Int = 0;
+
+    private var mainHandler = Handler(Looper.getMainLooper())
 
     private fun setStateIfNotCancelled(newState: Int): Int {
         synchronized(this) {
@@ -32,17 +41,28 @@ abstract class KillableThread {
 
     private fun runBody() {
         if (setStateIfNotCancelled(THREAD_SLOW_STARTED) != THREAD_CANCELLED) {
+            Log.d("Paperant", "thread ${"%x".format(threadHandle)} starts slow")
             slowAsync()  // only receives signal here
+            Log.d("Paperant", "thread ${"%x".format(threadHandle)} finishes slow")
             setStateIfNotCancelled(THREAD_SLOW_FINISHED)  // always not cancelled here
-            fastSynced()
+            mainHandler.post {
+                Log.d("Paperant", "thread ${"%x".format(threadHandle)} starts fast")
+                if (threadState == THREAD_CANCELLED)
+                    return@post
+                fastSynced()
+                Log.d("Paperant", "thread ${"%x".format(threadHandle)} finishes fast")
+            }
         }
     }
 
-    external fun run()
+    external fun start()
     external private fun sendSignal()
     external fun join()
 
     fun stop() {
+        if (!Looper.getMainLooper().isCurrentThread)
+            throw RuntimeException("not called from UI thread")
+
         synchronized(this) {
             val oldState = threadState
             threadState = THREAD_CANCELLED

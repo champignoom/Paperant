@@ -2,9 +2,10 @@ package com.champignoom.paperant.ui.mydocument
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.os.Handler
+import android.util.Log
 import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -14,6 +15,7 @@ import com.artifex.mupdf.fitz.PDFDocument
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import com.champignoom.paperant.KillableThread
 import com.champignoom.paperant.databinding.ActivityPdfDocumentBinding
+import kotlin.math.max
 
 
 class PdfDocumentViewModel : ViewModel() {
@@ -25,6 +27,7 @@ class PdfDocumentViewModel : ViewModel() {
 class PdfDocumentActivity : AppCompatActivity() {
     private val viewModel: PdfDocumentViewModel by viewModels()
     private lateinit var binding: ActivityPdfDocumentBinding
+    private var renderThread: KillableThread? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,16 +45,58 @@ class PdfDocumentActivity : AppCompatActivity() {
 
         binding.roundPad.setStep(4.0, viewModel.nPage.toDouble())
         binding.roundPad.onDeltaListener = ::onPageDelta
+
+        binding.pageView.onSizeChangeListener = {_, _ -> loadPage(max(0, viewModel.currentPageNum))}
+
+        val testIfThreadTerminateAfterDestroyActivity = object: KillableThread() {
+            override fun slowAsync() {
+                var i=0
+                while (true) {
+                    i += 1
+                    Log.d("Paperant", "test thread: i=${i}")
+                    Thread.sleep(1000)
+                }
+            }
+            override fun fastSynced() {
+                TODO("Not yet implemented")
+            }
+        }
+
+//        testThread.run()
     }
 
+    override fun onDestroy() {
+        renderThread?.stop()
+        super.onDestroy()
+    }
     private fun loadPage(pageNum: Int) {
         binding.pageView.setLoading()
         viewModel.currentPageNum = pageNum
-        val page = viewModel.doc!!.loadPage(viewModel.currentPageNum)
-        val size = binding.pageView.canvasSize
-        val ctm = AndroidDrawDevice.fitPage(page, size.width, size.height)
-        val bitmap = AndroidDrawDevice.drawPage(page, ctm)
-        binding.pageView.setLoaded(bitmap)
+
+        renderThread?.stop()
+        renderThread = object: KillableThread() {
+            private lateinit var mBitmap: Bitmap
+            override fun slowAsync() {
+                // FIXME: duplicate MuPDF context
+                val page = viewModel.doc!!.loadPage(viewModel.currentPageNum)
+                val size = binding.pageView.canvasSize
+                val ctm = AndroidDrawDevice.fitPage(page, size.width, size.height)
+                try {
+                    mBitmap = AndroidDrawDevice.drawPage(page, ctm)
+                }
+                catch (e: RuntimeException) {
+                    Log.d("Paperant", "exception while drawing page ${viewModel.currentPageNum}")
+                    e.printStackTrace()
+                }
+            }
+
+            override fun fastSynced() {
+                runOnUiThread {
+                    binding.pageView.setLoaded(mBitmap)
+                }
+            }
+        }
+        renderThread!!.start()
     }
 
     private fun onPageDelta(delta: Int) {
