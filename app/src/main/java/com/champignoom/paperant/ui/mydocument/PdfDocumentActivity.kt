@@ -3,10 +3,10 @@ package com.champignoom.paperant.ui.mydocument
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -14,14 +14,14 @@ import androidx.lifecycle.lifecycleScope
 import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.PDFDocument
+import com.artifex.mupdf.fitz.RectI
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
 import com.champignoom.paperant.databinding.ActivityPdfDocumentBinding
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlin.math.max
+import kotlin.time.measureTime
+import kotlin.time.measureTimedValue
 
 
 class PdfDocumentViewModel : ViewModel() {
@@ -30,10 +30,18 @@ class PdfDocumentViewModel : ViewModel() {
     var currentPageNum: Int = -1
 }
 
+private data class PageLoadRequest(val pageNum: Int, val token: Long);
+
+@OptIn(kotlin.time.ExperimentalTime::class)
 class PdfDocumentActivity : AppCompatActivity() {
     private val viewModel: PdfDocumentViewModel by viewModels()
     private lateinit var binding: ActivityPdfDocumentBinding
-    private var mCookie: Cookie? = null
+    private var cookie: Cookie? = null
+    private var pageToLoad = Channel<PageLoadRequest>(Channel.CONFLATED)
+
+    private var waitingToken: Long = -1
+    private var nextToken: Long = 0
+    private fun newToken() = nextToken++
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,8 +49,15 @@ class PdfDocumentActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         if (viewModel.doc == null) {
-            while (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED)
-                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE), 0)
+            while (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                ) == PackageManager.PERMISSION_DENIED)
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
+                    0
+                )
 
             val uri = intent.data ?: return
             viewModel.doc = Document.openDocument(uri.path) as PDFDocument
@@ -52,79 +67,52 @@ class PdfDocumentActivity : AppCompatActivity() {
         binding.roundPad.setStep(4.0, viewModel.nPage.toDouble())
         binding.roundPad.onDeltaListener = ::onPageDelta
 
-        binding.pageView.onSizeChangeListener = {_, _ -> loadPage(max(0, viewModel.currentPageNum))}
+        binding.pageView.onSizeChangeListener = { _, _ -> loadPage(max(0, viewModel.currentPageNum))}
 
-        val testIfThreadTerminateAfterDestroyActivity = object: KillableThread() {
-            override fun slowAsync() {
-                var i=0
-                while (true) {
-                    i += 1
-                    Log.d("Paperant", "test thread: i=${i}")
-                    Thread.sleep(1000)
-                }
-            }
-            override fun fastSynced() {
-                TODO("Not yet implemented")
-            }
-        }
-        lifecycleScope.launch(Dispatchers.Default) {
-            while (isActive) {
-
-            }
-        }
-
-//        testThread.run()
+        lifecycleScope.launch(Dispatchers.Default, block = pageRendererDaemon)
     }
 
     private val pageRendererDaemon: suspend CoroutineScope.() -> Unit = {
         while (isActive) {
-            // pop out the pagenum and token, block if doesn't exist
-            // new cookie
-            // get page
-            // draw
-            // post refresher to ui thread with token
+            val (pageNum, token) = pageToLoad.receive()
+            val (page, timePage) = measureTimedValue { viewModel.doc!!.loadPage(pageNum) }
+            val canvasSize = binding.pageView.canvasSize
+            val ctm = AndroidDrawDevice.fitPage(page, canvasSize.width, canvasSize.height)
+            val box = RectI(page.bounds.transform(ctm))
+            val w = box.x1 - box.x0
+            val h = box.y1 - box.y0
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            val dev = AndroidDrawDevice(bmp, box.x0, box.y0)
+            cookie = Cookie()
+            val timeRun = measureTime { page.run(dev, ctm, cookie) }  // FIXME TODO: test, retrieve the exception name and handle it
+            dev.close()
+            dev.destroy()
 
-        }
-    }
+            Log.d("Paperant", "page ${pageNum}: timePage=${timePage}, timeRun=${timeRun}")
 
-    private fun pageLoaderDaemon() {
-        while (coroutineContext.isActive) {
+            if (!isActive)
+                throw CancellationException()
 
+            runOnUiThread {
+                if (waitingToken != token)
+                    return@runOnUiThread
+
+                binding.pageView.setLoaded(bmp)
+            }
         }
     }
 
     override fun onDestroy() {
-        renderThread?.stop()
+        cookie?.abort()
         super.onDestroy()
     }
+
     private fun loadPage(pageNum: Int) {
+        cookie?.abort()
         binding.pageView.setLoading()
         viewModel.currentPageNum = pageNum
-
-        renderThread?.stop()
-        renderThread = object: KillableThread() {
-            private lateinit var mBitmap: Bitmap
-            override fun slowAsync() {
-                // FIXME: duplicate MuPDF context
-                val page = viewModel.doc!!.loadPage(viewModel.currentPageNum)
-                val size = binding.pageView.canvasSize
-                val ctm = AndroidDrawDevice.fitPage(page, size.width, size.height)
-                try {
-                    mBitmap = AndroidDrawDevice.drawPage(page, ctm)
-                }
-                catch (e: RuntimeException) {
-                    Log.d("Paperant", "exception while drawing page ${viewModel.currentPageNum}")
-                    e.printStackTrace()
-                }
-            }
-
-            override fun fastSynced() {
-                runOnUiThread {
-                    binding.pageView.setLoaded(mBitmap)
-                }
-            }
-        }
-        renderThread!!.start()
+        waitingToken = newToken()
+        pageToLoad.offer(PageLoadRequest(pageNum, waitingToken))  // always return true for CONFLATED channel
     }
 
     private fun onPageDelta(delta: Int) {

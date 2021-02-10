@@ -6,6 +6,7 @@ import android.net.Uri
 import com.champignoom.paperant.old.DocumentActivity
 import com.champignoom.paperant.ui.mydocument.MyDocumentActivity
 import com.champignoom.paperant.ui.mydocument.PdfDocumentActivity
+import kotlin.time.measureTimedValue
 
 fun myOpenDocument(context: Context, path: String, useExample: Boolean = false) {
     val cls = if (useExample) DocumentActivity::class else PdfDocumentActivity::class
