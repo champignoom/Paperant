@@ -10,11 +10,17 @@ import androidx.activity.viewModels
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.lifecycleScope
+import com.artifex.mupdf.fitz.Cookie
 import com.artifex.mupdf.fitz.Document
 import com.artifex.mupdf.fitz.PDFDocument
 import com.artifex.mupdf.fitz.android.AndroidDrawDevice
-import com.champignoom.paperant.KillableThread
 import com.champignoom.paperant.databinding.ActivityPdfDocumentBinding
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 import kotlin.math.max
 
 
@@ -27,7 +33,7 @@ class PdfDocumentViewModel : ViewModel() {
 class PdfDocumentActivity : AppCompatActivity() {
     private val viewModel: PdfDocumentViewModel by viewModels()
     private lateinit var binding: ActivityPdfDocumentBinding
-    private var renderThread: KillableThread? = null
+    private var mCookie: Cookie? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,8 +67,30 @@ class PdfDocumentActivity : AppCompatActivity() {
                 TODO("Not yet implemented")
             }
         }
+        lifecycleScope.launch(Dispatchers.Default) {
+            while (isActive) {
+
+            }
+        }
 
 //        testThread.run()
+    }
+
+    private val pageRendererDaemon: suspend CoroutineScope.() -> Unit = {
+        while (isActive) {
+            // pop out the pagenum and token, block if doesn't exist
+            // new cookie
+            // get page
+            // draw
+            // post refresher to ui thread with token
+
+        }
+    }
+
+    private fun pageLoaderDaemon() {
+        while (coroutineContext.isActive) {
+
+        }
     }
 
     override fun onDestroy() {

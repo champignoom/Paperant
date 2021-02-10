@@ -62,3 +62,9 @@ command used for building the native library for unit test on host:
 `gcc -shared -fPIC -g -o app/build/intermediates/stripped_native_libs/debug/out/lib/x86_64/libkillable-thread.so -I/usr/lib/jvm/java-8-openjdk/include -I/usr/lib/jvm/java-8-openjdk/include/linux app/src//main//cpp//killable-thread.c`
 
 <https://github.com/ArtifexSoftware/mupdf-android-appkit/blob/37d908ae035dc7275983666690638467fb717ccd/solib/library/src/mupdf/java/com/artifex/solib/MuPDFPage.java#L293>
+
+`Dispatchers.Default` is multithreaded.
+
+`lifecycleScope` only works on cooperative coroutines that checks `isActive` regularly.
+
+`Channel.CONFLATED` is aware of cancellation and reserves only the last provided element.
