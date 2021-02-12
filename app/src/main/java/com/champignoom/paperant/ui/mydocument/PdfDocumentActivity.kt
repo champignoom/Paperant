@@ -68,6 +68,8 @@ class PdfDocumentActivity : AppCompatActivity() {
 
         binding.pageView.onSizeChangeListener = { _, _ -> loadPage(max(0, viewModel.currentPageNum)) }
         binding.pageView.onPatchChangeListener = { mtx -> loadPage(viewModel.currentPageNum, mtx) }
+        binding.pageView.onPageDeltaClicked = ::onPageDelta
+        binding.pageView.onSingleTapListener = ::toggleBar
 
         lifecycleScope.launch(Dispatchers.Default, block = pageRendererDaemon)
     }
@@ -133,5 +135,13 @@ class PdfDocumentActivity : AppCompatActivity() {
         if (viewModel.currentPageNum == newPageNum)
             return
         loadPage(newPageNum)
+    }
+
+    private fun toggleBar() {
+        val bar = supportActionBar ?: return
+        if (bar.isShowing)
+            bar.hide()
+        else
+            bar.show()
     }
 }

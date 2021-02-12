@@ -1,3 +1,4 @@
+include ':fitz'
 include ':round_pad'
 include ':app'
 rootProject.name = "Paperant"

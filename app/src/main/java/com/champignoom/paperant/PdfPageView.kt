@@ -11,9 +11,14 @@ import android.view.ScaleGestureDetector
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.ProgressBar
+import androidx.core.view.GestureDetectorCompat
 import kotlin.math.max
 
 class PdfPageView(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, atts) {
+    companion object {
+        const val PAGE_DELTA_WIDTH = 0.1f
+    }
+
     private val mFull = ImageView(ctx).also {
         it.scaleType = ImageView.ScaleType.MATRIX
         addView(it, LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
@@ -27,6 +32,8 @@ class PdfPageView(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, atts) {
 
     var onSizeChangeListener: ((w: Int, h: Int) -> Unit)? = null
     var onPatchChangeListener: ((Transform) -> Unit)? = null
+    var onPageDeltaClicked: ((delta: Int) -> Unit)? = null
+    var onSingleTapListener: (() -> Unit)? = null
 
     var imageSize: Size? = null
     val canvasSize get() = Size(mFull.width, mFull.height)
@@ -55,7 +62,7 @@ class PdfPageView(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, atts) {
     })
 
 
-    val scaleDetector = ScaleGestureDetector(context, object: ScaleGestureDetector.SimpleOnScaleGestureListener() {
+    private val scaleDetector = ScaleGestureDetector(context, object: ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             if (isLoading())
                 return true
@@ -77,6 +84,24 @@ class PdfPageView(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, atts) {
 
         override fun onScaleEnd(detector: ScaleGestureDetector) {
             onPatchChangeListener?.invoke(mtxFull)
+        }
+    })
+
+    private val turnOnePageDetector = GestureDetector(context, object: GestureDetector.SimpleOnGestureListener() {
+        override fun onDown(e: MotionEvent): Boolean {
+            when {
+                e.x < width * PAGE_DELTA_WIDTH -> onPageDeltaClicked?.invoke(-1)
+                e.x > width * (1 - PAGE_DELTA_WIDTH) -> onPageDeltaClicked?.invoke(1)
+                else -> return false
+            }
+            return true
+        }
+    })
+
+    private val singleTapDetector = GestureDetector(context, object: GestureDetector.SimpleOnGestureListener() {
+        override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+            onSingleTapListener?.invoke()
+            return true
         }
     })
 
@@ -116,6 +141,9 @@ class PdfPageView(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, atts) {
     override fun onTouchEvent(e: MotionEvent): Boolean {
         moveDetector.onTouchEvent(e)
         scaleDetector.onTouchEvent(e)
+        if (!turnOnePageDetector.onTouchEvent(e)) {
+            singleTapDetector.onTouchEvent(e)
+        }
         return true
     }
 }

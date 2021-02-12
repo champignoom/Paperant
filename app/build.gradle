@@ -34,6 +34,7 @@ android {
 }
 
 dependencies {
+    implementation project(path: ':fitz')
     def room_version = "2.2.6"
 
     implementation "androidx.room:room-runtime:$room_version"
@@ -58,7 +59,6 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
 
 //    api 'com.artifex.mupdf:mini:1.17.0'
-    implementation 'com.artifex.mupdf:fitz:1.18.0'
     api project(':round_pad')
 }
 repositories {
