@@ -106,6 +106,7 @@ class PdfDocumentActivity : AppCompatActivity() {
             runOnUiThread {
                 if (waitingToken != token)
                     return@runOnUiThread
+                Log.d("Paperant", "rendering request with token=${token}, isScaled=${trans!=null}")
 
                 if (trans == null)
                     binding.pageView.setLoaded(bmp)
@@ -128,6 +129,7 @@ class PdfDocumentActivity : AppCompatActivity() {
         }
         waitingToken = newToken()
         pageToLoad.offer(PageLoadRequest(pageNum, waitingToken, mtx))  // always return true for CONFLATED channel
+        Log.d("Paperant", "loadPage: pageNum=${pageNum}, new token=${waitingToken}, isScaled=${mtx!=null}")
     }
 
     private fun onPageDelta(delta: Int) {

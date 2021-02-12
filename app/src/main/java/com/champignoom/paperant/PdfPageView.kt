@@ -3,6 +3,7 @@ package com.champignoom.paperant
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
+import android.util.Log
 import android.util.Size
 import android.view.GestureDetector
 import android.view.Gravity
@@ -48,7 +49,7 @@ class PdfPageView(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, atts) {
     private val moveDetector = GestureDetector(context, object: GestureDetector.SimpleOnGestureListener() {
         override fun onScroll(e1: MotionEvent, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
             if (isLoading())
-                return true
+                return false
 
             mtxFull.translate(-distanceX, -distanceY)
             val delta = mtxFull.fitDelta(imageSize!!, canvasSize)
@@ -65,7 +66,7 @@ class PdfPageView(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, atts) {
     private val scaleDetector = ScaleGestureDetector(context, object: ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             if (isLoading())
-                return true
+                return false
 
             val f = max(detector.scaleFactor, 1f/mtxFull.scale)
             val x = detector.focusX
@@ -83,12 +84,17 @@ class PdfPageView(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, atts) {
         }
 
         override fun onScaleEnd(detector: ScaleGestureDetector) {
+            if (isLoading())
+                return
             onPatchChangeListener?.invoke(mtxFull)
         }
     })
 
     private val turnOnePageDetector = GestureDetector(context, object: GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent): Boolean {
+            if (isLoading())
+                return false
+
             when {
                 e.x < width * PAGE_DELTA_WIDTH -> onPageDeltaClicked?.invoke(-1)
                 e.x > width * (1 - PAGE_DELTA_WIDTH) -> onPageDeltaClicked?.invoke(1)
@@ -110,10 +116,12 @@ class PdfPageView(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, atts) {
         mLocal.setImageDrawable(null)
 //        mThumbnail.setImageDrawable(null)
         mProgressBar.visibility = VISIBLE
+        Log.d("Paperant", "progress bar visible")
     }
 
     fun setLoaded(fullBitmap: Bitmap) {
         mProgressBar.visibility = GONE
+        Log.d("Paperant", "progress bar gone")
         mtxFull.reset()
         imageSize = Size(fullBitmap.width, fullBitmap.height)
         val offset = mtxFull.fitDelta(imageSize!!, canvasSize)
@@ -127,6 +135,8 @@ class PdfPageView(ctx: Context, atts: AttributeSet?): FrameLayout(ctx, atts) {
     }
 
     fun setScaleLoaded(localBitmap: Bitmap) {
+        if (isLoading())
+            throw RuntimeException("setScaleLoaded while isLoading is true")
         mLocal.setImageBitmap(localBitmap)
         mtxLocal.reset()
         val delta = mtxLocal.fitDelta(bitmapSize(localBitmap), canvasSize)
